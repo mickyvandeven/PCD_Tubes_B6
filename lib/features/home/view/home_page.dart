@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/models/scan_result_model.dart';
+import '../../../data/services/nutrition_service.dart';
 import '../../../widgets/fat_bottom_nav.dart';
+import '../../history/history_page.dart';
+import '../../profile/profile_page.dart';
+import '../../scanner/scanner_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key, this.userName = 'Ridho'});
@@ -13,12 +17,13 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final nutritionSvc = NutritionService();
     final latestScan = ScanResultModel(
       id: 'scan-001',
       tanggal: DateTime(2026, 5, 21),
       imagePath: 'assets/images/salad.jpg',
-      fatPercentage: 3,
-      status: 'Low fat',
+      foods: [nutritionSvc.createFoodItem('Salad', confidence: 0.95)],
+      status: 'Low Fat',
     );
 
     final recentScans = <_RecentScanItem>[
@@ -314,7 +319,7 @@ class _DailyFatCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Scan terakhir: ${latestScan.imagePath.split('/').last} • ${latestScan.status}',
+                    'Scan terakhir: ${latestScan.imagePath.split('/').last} • ${latestScan.status} • Fat: ${latestScan.totalFat.toStringAsFixed(1)}g',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: const Color(0xFF4D7060),
                       fontWeight: FontWeight.w500,

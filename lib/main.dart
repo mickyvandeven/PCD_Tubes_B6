@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
+import 'data/services/hive_service.dart';
 import 'features/history/history_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/onboarding/onboarding_page.dart';
 import 'features/profile/profile_page.dart';
 import 'features/scanner/scanner_page.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Hive untuk penyimpanan riwayat scan
+  await HiveService.init();
+
+  runApp(const FatScanApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FatScanApp extends StatelessWidget {
+  const FatScanApp({super.key});
 
   static final GoRouter _router = GoRouter(
     initialLocation: '/onboarding',
@@ -45,11 +52,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'FatScan',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      routerConfig: _router,
+    return Provider<HiveService>(
+      create: (_) => HiveService(),
+      child: MaterialApp.router(
+        title: 'FatScan',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        routerConfig: _router,
+      ),
     );
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../data/models/scan_result_model.dart';
+import '../../data/services/hive_service.dart';
 import '../../widgets/fat_bottom_nav.dart';
 
 class HistoryPage extends StatelessWidget {
@@ -8,30 +11,10 @@ class HistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hive = context.read<HiveService>();
+    final scans = hive.getAllScans();
+
     final weeklyValues = <double>[12, 14, 13, 20, 8, 35, 22];
-    final foodLogs = <_FoodLogItem>[
-      const _FoodLogItem(
-        name: 'Oatmeal',
-        time: '08:00 WIB',
-        fatGram: 3,
-        accentColor: Color(0xFF29F2C8),
-        icon: Icons.breakfast_dining,
-      ),
-      const _FoodLogItem(
-        name: 'Nasi Padang',
-        time: '13:30 WIB',
-        fatGram: 15,
-        accentColor: Color(0xFFFF5D6C),
-        icon: Icons.ramen_dining,
-      ),
-      const _FoodLogItem(
-        name: 'Ayam Goreng',
-        time: '19:00 WIB',
-        fatGram: 6,
-        accentColor: Color(0xFFFFC34D),
-        icon: Icons.restaurant,
-      ),
-    ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8F2),
@@ -75,26 +58,50 @@ class HistoryPage extends StatelessWidget {
                 const SizedBox(height: 20),
                 _SummaryCard(weeklyAverage: 32, chartValues: weeklyValues),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Text(
-                      'Hari Ini',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF1C3028),
-                        fontWeight: FontWeight.w700,
+                // Real scan history from Hive
+                if (scans.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Text(
+                        'Riwayat Scan',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    _PillInfo(text: '24g total'),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...foodLogs.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _FoodLogCard(item: item),
+                      const Spacer(),
+                      _PillInfo(text: '${scans.length} scan'),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  ...scans.map(
+                    (scan) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ScanHistoryCard(scan: scan),
+                    ),
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Text(
+                        'Hari Ini',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      const _PillInfo(text: '24g total'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ..._demoFoodLogs.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _FoodLogCard(item: item),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -102,7 +109,188 @@ class HistoryPage extends StatelessWidget {
       ),
     );
   }
+
+  static final _demoFoodLogs = <_FoodLogItem>[
+    const _FoodLogItem(
+      name: 'Oatmeal',
+      time: '08:00 WIB',
+      fatGram: 3,
+      accentColor: Color(0xFF29F2C8),
+      icon: Icons.breakfast_dining,
+    ),
+    const _FoodLogItem(
+      name: 'Nasi Padang',
+      time: '13:30 WIB',
+      fatGram: 15,
+      accentColor: Color(0xFFFF5D6C),
+      icon: Icons.ramen_dining,
+    ),
+    const _FoodLogItem(
+      name: 'Ayam Goreng',
+      time: '19:00 WIB',
+      fatGram: 6,
+      accentColor: Color(0xFFFFC34D),
+      icon: Icons.restaurant,
+    ),
+  ];
 }
+
+// ─── Scan History Card (Real Data) ───────────────────────────────────────────
+
+class _ScanHistoryCard extends StatelessWidget {
+  const _ScanHistoryCard({required this.scan});
+
+  final ScanResultModel scan;
+
+  Color get _fatColor {
+    switch (scan.fatStatus) {
+      case FatStatus.low:
+        return const Color(0xFF44F0D2);
+      case FatStatus.medium:
+        return const Color(0xFFFFC94D);
+      case FatStatus.high:
+        return const Color(0xFFFF5C6B);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B2040),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      _fatColor.withOpacity(0.9),
+                      _fatColor.withOpacity(0.3),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scan.foods.isNotEmpty
+                          ? scan.foods.map((f) => f.name).join(', ')
+                          : 'Scan Result',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatDate(scan.tanggal),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${scan.totalFat.toStringAsFixed(1)}g',
+                    style: TextStyle(
+                      color: _fatColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    scan.fatStatus.shortLabel,
+                    style: TextStyle(
+                      color: _fatColor.withOpacity(0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 5,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: _fatColor,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ],
+          ),
+          if (scan.foods.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: scan.foods.map((food) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF252D4A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${food.name} ${food.fat.toStringAsFixed(1)}g fat',
+                    style: const TextStyle(color: Colors.white60, fontSize: 11),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+// ─── TopNavigation ────────────────────────────────────────────────────────────
 
 class _TopNavigation extends StatelessWidget {
   const _TopNavigation();
