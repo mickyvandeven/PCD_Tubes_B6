@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-
-import '../../../core/router/no_transition_route.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../data/models/scan_result_model.dart';
 import '../../../widgets/fat_bottom_nav.dart';
-import '../../history/history_page.dart';
-import '../../scanner/scanner_page.dart';
-import '../../profile/profile_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key, this.userName = 'Ridho'});
@@ -60,21 +56,12 @@ class HomePage extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F8F2),
       bottomNavigationBar: FatBottomNav(
         currentIndex: 0,
-        onScanTap: () {
-          Navigator.of(
-            context,
-          ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
-        },
+        onScanTap: () => context.push('/scanner'),
         onTap: (index) {
-          if (index == 1) {
-            Navigator.of(context).pushReplacement(
-              NoTransitionRoute(builder: (_) => const HistoryPage()),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).pushReplacement(
-              NoTransitionRoute(builder: (_) => const ProfilePage()),
-            );
-          }
+          if (index == 1)
+            context.go('/history');
+          else if (index == 2)
+            context.go('/profile');
         },
       ),
       body: Container(
@@ -222,10 +209,6 @@ class _TopBar extends StatelessWidget {
             color: const Color(0xFFEBF4E8),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: Color(0xFF4D7060),
-          ),
         ),
       ],
     );
@@ -347,11 +330,7 @@ class _DailyFatCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {
-                Navigator.of(
-                  context,
-                ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
-              },
+              onPressed: () => context.push('/scanner'),
               icon: const Icon(Icons.qr_code_scanner_rounded),
               label: const Text('Scan Sekarang'),
               style: FilledButton.styleFrom(
@@ -572,8 +551,8 @@ class _RecentScanCard extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    item.accentColor.withOpacity(0.95),
-                    const Color(0xFF10162A),
+                    item.accentColor.withOpacity(0.85),
+                    item.accentColor.withOpacity(0.18),
                   ],
                 ),
               ),

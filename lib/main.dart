@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
+import 'features/history/history_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/onboarding/onboarding_page.dart';
 import 'features/profile/profile_page.dart';
+import 'features/scanner/scanner_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,16 +18,27 @@ class MyApp extends StatelessWidget {
   static final GoRouter _router = GoRouter(
     initialLocation: '/onboarding',
     routes: <RouteBase>[
-      GoRoute(path: '/', redirect: (context, state) => '/onboarding'),
-      GoRoute(path: '/splash', redirect: (context, state) => '/onboarding'),
-      GoRoute(path: '/home', builder: (context, state) => const HomePage()),
+      GoRoute(path: '/', redirect: (_, __) => '/onboarding'),
+      GoRoute(path: '/splash', redirect: (_, __) => '/onboarding'),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingPage(),
+        pageBuilder: (_, __) => const NoTransitionPage(child: OnboardingPage()),
+      ),
+      GoRoute(
+        path: '/home',
+        pageBuilder: (_, __) => const NoTransitionPage(child: HomePage()),
+      ),
+      GoRoute(
+        path: '/history',
+        pageBuilder: (_, __) => const NoTransitionPage(child: HistoryPage()),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfilePage(),
+        pageBuilder: (_, __) => const NoTransitionPage(child: ProfilePage()),
+      ),
+      GoRoute(
+        path: '/scanner',
+        pageBuilder: (_, __) => const NoTransitionPage(child: ScannerPage()),
       ),
     ],
   );

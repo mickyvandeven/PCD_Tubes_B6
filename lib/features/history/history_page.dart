@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-
-import '../../core/router/no_transition_route.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../widgets/fat_bottom_nav.dart';
-import '../home/view/home_page.dart';
-import '../scanner/scanner_page.dart';
-import '../profile/profile_page.dart';
 
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
@@ -41,21 +37,12 @@ class HistoryPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F8F2),
       bottomNavigationBar: FatBottomNav(
         currentIndex: 1,
-        onScanTap: () {
-          Navigator.of(
-            context,
-          ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
-        },
+        onScanTap: () => context.push('/scanner'),
         onTap: (index) {
-          if (index == 0) {
-            Navigator.of(context).pushReplacement(
-              NoTransitionRoute(builder: (_) => const HomePage()),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).pushReplacement(
-              NoTransitionRoute(builder: (_) => const ProfilePage()),
-            );
-          }
+          if (index == 0)
+            context.go('/home');
+          else if (index == 2)
+            context.go('/profile');
         },
       ),
       body: Container(
@@ -139,10 +126,6 @@ class _TopNavigation extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFFEBF4E8),
             borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: Color(0xFF4D7060),
           ),
         ),
       ],
