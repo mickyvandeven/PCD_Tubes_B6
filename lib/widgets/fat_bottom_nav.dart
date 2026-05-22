@@ -26,12 +26,12 @@ class FatBottomNav extends StatelessWidget {
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
               padding: const EdgeInsets.fromLTRB(12, 18, 12, 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF161C32),
+                color: const Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white10),
+                border: Border.all(color: const Color(0xFFC8E2D0)),
                 boxShadow: const [
                   BoxShadow(
-                    color: Colors.black38,
+                    color: Color(0x142D7A4F),
                     blurRadius: 20,
                     offset: Offset(0, 12),
                   ),
@@ -91,8 +91,10 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = selected ? const Color(0xFF4FE9C9) : Colors.white60;
-    final background = selected ? const Color(0xFF23324F) : Colors.transparent;
+    final foreground = selected
+        ? const Color(0xFF2D7A4F)
+        : const Color(0xFF9AB5A5);
+    final background = selected ? const Color(0xFFD0EDE0) : Colors.transparent;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -130,7 +132,6 @@ class _NavItem extends StatelessWidget {
 
 class _ScanButton extends StatelessWidget {
   const _ScanButton({required this.onTap});
-
   final VoidCallback onTap;
 
   @override
@@ -148,12 +149,15 @@ class _ScanButton extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF44F0D2), Color(0xFF2D79FF)],
+              colors: [Color(0xFF2D7A4F), Color(0xFF48C78A)],
             ),
-            border: Border.all(color: Colors.white24, width: 2),
+            border: Border.all(
+              color: const Color(0xFFFFFFFF).withOpacity(0.4),
+              width: 2,
+            ),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x5535EFC4),
+                color: Color(0x402D7A4F),
                 blurRadius: 24,
                 offset: Offset(0, 10),
               ),

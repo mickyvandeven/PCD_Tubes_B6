@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/router/no_transition_route.dart';
+
 import '../../widgets/fat_bottom_nav.dart';
-import '../home/home_page.dart';
+import '../home/view/home_page.dart';
 import '../scanner/scanner_page.dart';
 import '../profile/profile_page.dart';
 
@@ -36,34 +38,28 @@ class HistoryPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF12162A),
+      backgroundColor: const Color(0xFFF5F8F2),
       bottomNavigationBar: FatBottomNav(
         currentIndex: 1,
         onScanTap: () {
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const ScannerPage()));
+          ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
         },
         onTap: (index) {
           if (index == 0) {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const HomePage()),
+              NoTransitionRoute(builder: (_) => const HomePage()),
             );
           } else if (index == 2) {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
+              NoTransitionRoute(builder: (_) => const ProfilePage()),
             );
           }
         },
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A2040), Color(0xFF12162A), Color(0xFF0E1122)],
-          ),
-        ),
+        color: const Color(0xFFF5F8F2),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -78,7 +74,7 @@ class HistoryPage extends StatelessWidget {
                       'Riwayat Lemak',
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(
-                            color: Colors.white,
+                            color: const Color(0xFF1C3028),
                             fontWeight: FontWeight.w700,
                           ),
                     ),
@@ -97,7 +93,7 @@ class HistoryPage extends StatelessWidget {
                     Text(
                       'Hari Ini',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
+                        color: const Color(0xFF1C3028),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -131,7 +127,7 @@ class _TopNavigation extends StatelessWidget {
         const Text(
           'History / Fat Log',
           style: TextStyle(
-            color: Color(0xFF7E849D),
+            color: Color(0xFF9AB5A5),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -141,12 +137,12 @@ class _TopNavigation extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: const Color(0xFF202744),
+            color: const Color(0xFFEBF4E8),
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(
             Icons.notifications_none_rounded,
-            color: Colors.white70,
+            color: Color(0xFF4D7060),
           ),
         ),
       ],
@@ -156,7 +152,6 @@ class _TopNavigation extends StatelessWidget {
 
 class _FilterChip extends StatelessWidget {
   const _FilterChip({required this.label, required this.icon});
-
   final String label;
   final IconData icon;
 
@@ -165,22 +160,22 @@ class _FilterChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF232A46),
+        color: const Color(0xFFEBF4E8),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
       ),
       child: Row(
         children: [
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white70,
+              color: Color(0xFF4D7060),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(width: 4),
-          Icon(icon, size: 18, color: Colors.white60),
+          Icon(icon, size: 18, color: const Color(0xFF4D7060)),
         ],
       ),
     );
@@ -189,7 +184,6 @@ class _FilterChip extends StatelessWidget {
 
 class _PillInfo extends StatelessWidget {
   const _PillInfo({required this.text});
-
   final String text;
 
   @override
@@ -197,13 +191,13 @@ class _PillInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF232A46),
+        color: const Color(0xFFEBF4E8),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white70,
+          color: Color(0xFF4D7060),
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -214,7 +208,6 @@ class _PillInfo extends StatelessWidget {
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.weeklyAverage, required this.chartValues});
-
   final int weeklyAverage;
   final List<double> chartValues;
 
@@ -224,15 +217,11 @@ class _SummaryCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1B2143), Color(0xFF162342), Color(0xFF0D1932)],
-        ),
-        border: Border.all(color: Colors.white10),
+        color: const Color(0xFFFFFFFF),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
         boxShadow: const [
           BoxShadow(
-            color: Colors.black38,
+            color: Color(0x142D7A4F),
             blurRadius: 24,
             offset: Offset(0, 18),
           ),
@@ -244,7 +233,7 @@ class _SummaryCard extends StatelessWidget {
           Text(
             'RATA-RATA 7 HARI',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Colors.white54,
+              color: const Color(0xFF4D7060),
               letterSpacing: 1.2,
               fontWeight: FontWeight.w700,
             ),
@@ -256,7 +245,7 @@ class _SummaryCard extends StatelessWidget {
               Text(
                 '$weeklyAverage',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: const Color(0xFF44F0D2),
+                  color: const Color(0xFF2D7A4F),
                   fontWeight: FontWeight.w800,
                   height: 0.9,
                 ),
@@ -266,7 +255,7 @@ class _SummaryCard extends StatelessWidget {
                 child: Text(
                   'g / hari',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white70,
+                    color: const Color(0xFF4D7060),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -283,7 +272,6 @@ class _SummaryCard extends StatelessWidget {
 
 class _FatLineChart extends StatelessWidget {
   const _FatLineChart({required this.values});
-
   final List<double> values;
 
   @override
@@ -317,7 +305,6 @@ class _FatLineChart extends StatelessWidget {
 
 class _LimitBadge extends StatelessWidget {
   const _LimitBadge({required this.text});
-
   final String text;
 
   @override
@@ -325,14 +312,14 @@ class _LimitBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF13253C),
+        color: const Color(0xFFD0EDE0),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2CECC6).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFF2D7A4F).withOpacity(0.4)),
       ),
       child: Text(
         text,
         style: const TextStyle(
-          color: Color(0xFFAEE9D8),
+          color: Color(0xFF2D7A4F),
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
@@ -354,7 +341,9 @@ class _WeekLabels extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: label == 'Min' ? const Color(0xFF44F0D2) : Colors.white54,
+              color: label == 'Min'
+                  ? const Color(0xFF2D7A4F)
+                  : const Color(0xFF9AB5A5),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -366,15 +355,12 @@ class _WeekLabels extends StatelessWidget {
 
 class _FatChartPainter extends CustomPainter {
   _FatChartPainter({required this.values, required this.limitValue});
-
   final List<double> values;
   final double limitValue;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (values.isEmpty) {
-      return;
-    }
+    if (values.isEmpty) return;
 
     const leftPadding = 10.0;
     const rightPadding = 10.0;
@@ -382,12 +368,11 @@ class _FatChartPainter extends CustomPainter {
     const bottomPadding = 42.0;
     final chartWidth = size.width - leftPadding - rightPadding;
     final chartHeight = size.height - topPadding - bottomPadding;
-    final maxValue = 50.0;
+    const maxValue = 50.0;
 
     final gridPaint = Paint()
-      ..color = const Color(0xFF3A4765).withOpacity(0.45)
+      ..color = const Color(0xFFD5EAD9).withOpacity(0.45)
       ..strokeWidth = 1;
-
     for (var i = 0; i < 3; i++) {
       final y = topPadding + (chartHeight / 2) * i;
       canvas.drawLine(
@@ -400,7 +385,7 @@ class _FatChartPainter extends CustomPainter {
     final limitY =
         topPadding + chartHeight - (limitValue / maxValue) * chartHeight;
     final limitPaint = Paint()
-      ..color = const Color(0xFF2CECC6).withOpacity(0.6)
+      ..color = const Color(0xFF2D7A4F).withOpacity(0.6)
       ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
     canvas.drawLine(
@@ -429,13 +414,13 @@ class _FatChartPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x6631F4D3), Color(0x0017E1BD)],
+        colors: [Color(0x442D7A4F), Color(0x002D7A4F)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(areaPath, areaPaint);
 
     final linePaint = Paint()
       ..shader = const LinearGradient(
-        colors: [Color(0xFF2EF3CF), Color(0xFF31D7FF)],
+        colors: [Color(0xFF2D7A4F), Color(0xFF48A970)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6
@@ -446,40 +431,31 @@ class _FatChartPainter extends CustomPainter {
     for (var index = 0; index < points.length - 1; index++) {
       final current = points[index];
       final next = points[index + 1];
-      final controlPoint1 = Offset(
+      linePath.cubicTo(
         current.dx + (next.dx - current.dx) * 0.45,
         current.dy,
-      );
-      final controlPoint2 = Offset(
         current.dx + (next.dx - current.dx) * 0.55,
         next.dy,
-      );
-      linePath.cubicTo(
-        controlPoint1.dx,
-        controlPoint1.dy,
-        controlPoint2.dx,
-        controlPoint2.dy,
         next.dx,
         next.dy,
       );
     }
     canvas.drawPath(linePath, linePaint);
 
-    final dotPaint = Paint()..color = const Color(0xFFEFFDF9);
+    final dotPaint = Paint()..color = const Color(0xFFFFFFFF);
     for (final point in points) {
       canvas.drawCircle(point, 4.5, dotPaint);
       canvas.drawCircle(
         point,
         8,
-        Paint()..color = const Color(0xFF32F3D1).withOpacity(0.15),
+        Paint()..color = const Color(0xFF2D7A4F).withOpacity(0.15),
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _FatChartPainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.limitValue != limitValue;
-  }
+  bool shouldRepaint(covariant _FatChartPainter oldDelegate) =>
+      oldDelegate.values != values || oldDelegate.limitValue != limitValue;
 }
 
 class _FoodLogItem {
@@ -490,7 +466,6 @@ class _FoodLogItem {
     required this.accentColor,
     required this.icon,
   });
-
   final String name;
   final String time;
   final int fatGram;
@@ -500,7 +475,6 @@ class _FoodLogItem {
 
 class _FoodLogCard extends StatelessWidget {
   const _FoodLogCard({required this.item});
-
   final _FoodLogItem item;
 
   @override
@@ -508,12 +482,12 @@ class _FoodLogCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B2040),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
         boxShadow: const [
           BoxShadow(
-            color: Colors.black26,
+            color: Color(0x142D7A4F),
             blurRadius: 18,
             offset: Offset(0, 10),
           ),
@@ -545,7 +519,7 @@ class _FoodLogCard extends StatelessWidget {
                 Text(
                   item.name,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: const Color(0xFF1C3028),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -553,7 +527,7 @@ class _FoodLogCard extends StatelessWidget {
                 Text(
                   item.time,
                   style: const TextStyle(
-                    color: Colors.white54,
+                    color: Color(0xFF4D7060),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -568,7 +542,7 @@ class _FoodLogCard extends StatelessWidget {
               Text(
                 '${item.fatGram}g',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: const Color(0xFF1C3028),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -576,7 +550,7 @@ class _FoodLogCard extends StatelessWidget {
               const Text(
                 'Lemak',
                 style: TextStyle(
-                  color: Colors.white54,
+                  color: Color(0xFF4D7060),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),

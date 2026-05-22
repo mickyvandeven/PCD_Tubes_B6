@@ -6,10 +6,10 @@ class ScannerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF11162A),
+      backgroundColor: const Color(0xFFF5F8F2),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF11162A),
-        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F8F2),
+        foregroundColor: const Color(0xFF1C3028),
         title: const Text('Scanner'),
       ),
       body: Center(
@@ -23,12 +23,12 @@ class ScannerPage extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(24, 34, 24, 42),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1F37),
+                  color: const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white10),
+                  border: Border.all(color: const Color(0xFFC8E2D0)),
                   boxShadow: const [
                     BoxShadow(
-                      color: Colors.black38,
+                      color: Color(0x142D7A4F),
                       blurRadius: 26,
                       offset: Offset(0, 18),
                     ),
@@ -43,11 +43,11 @@ class ScannerPage extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF44F0D2), Color(0xFF2D79FF)],
+                          colors: [Color(0xFF2D7A4F), Color(0xFF48C78A)],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF44F0D2).withOpacity(0.25),
+                            color: const Color(0xFF2D7A4F).withOpacity(0.25),
                             blurRadius: 24,
                             spreadRadius: 4,
                           ),
@@ -63,7 +63,7 @@ class ScannerPage extends StatelessWidget {
                     Text(
                       'Siap scan makanan',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
+                        color: const Color(0xFF1C3028),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -72,7 +72,7 @@ class ScannerPage extends StatelessWidget {
                       'Halaman scanner siap disambungkan ke kamera atau input gambar nantinya.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
+                        color: const Color(0xFF4D7060),
                         height: 1.4,
                       ),
                     ),
@@ -91,8 +91,6 @@ class ScannerPage extends StatelessWidget {
                     icon: const Icon(Icons.camera_alt_rounded),
                     label: const Text('Mulai Scan'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF44F0D2),
-                      foregroundColor: const Color(0xFF0D1020),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       textStyle: const TextStyle(fontWeight: FontWeight.w700),
                       shape: RoundedRectangleBorder(

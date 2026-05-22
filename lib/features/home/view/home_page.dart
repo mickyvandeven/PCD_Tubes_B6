@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../data/models/scan_result_model.dart';
-import '../../widgets/fat_bottom_nav.dart';
-import '../history/history_page.dart';
-import '../scanner/scanner_page.dart';
-import '../profile/profile_page.dart';
+import '../../../core/router/no_transition_route.dart';
+
+import '../../../data/models/scan_result_model.dart';
+import '../../../widgets/fat_bottom_nav.dart';
+import '../../history/history_page.dart';
+import '../../scanner/scanner_page.dart';
+import '../../profile/profile_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key, this.userName = 'Ridho'});
@@ -55,34 +57,28 @@ class HomePage extends StatelessWidget {
     final percent = _fatPercentage(consumedFat, maxFat).round();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF11162A),
+      backgroundColor: const Color(0xFFF5F8F2),
       bottomNavigationBar: FatBottomNav(
         currentIndex: 0,
         onScanTap: () {
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const ScannerPage()));
+          ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
         },
         onTap: (index) {
           if (index == 1) {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const HistoryPage()),
+              NoTransitionRoute(builder: (_) => const HistoryPage()),
             );
           } else if (index == 2) {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
+              NoTransitionRoute(builder: (_) => const ProfilePage()),
             );
           }
         },
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF151A30), Color(0xFF0F1322), Color(0xFF0D1020)],
-          ),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFFF5F8F2)),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
@@ -94,7 +90,7 @@ class HomePage extends StatelessWidget {
                 Text(
                   'Home Dashboard',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white54,
+                    color: const Color(0xFF9AB5A5),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -118,7 +114,7 @@ class HomePage extends StatelessWidget {
                         children: const [
                           _QuickStatCard(
                             icon: Icons.restaurant_menu,
-                            iconColor: Color(0xFF35EFC4),
+                            iconColor: Color(0xFF2D7A4F),
                             title: 'Scanned Today',
                             value: '4 items',
                           ),
@@ -147,7 +143,7 @@ class HomePage extends StatelessWidget {
                     Text(
                       'Scan Terakhir',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
+                        color: const Color(0xFF1C3028),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -155,7 +151,7 @@ class HomePage extends StatelessWidget {
                     TextButton(
                       onPressed: () {},
                       style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF4FE9C9),
+                        foregroundColor: const Color(0xFF2D7A4F),
                       ),
                       child: const Text('Lihat Semua'),
                     ),
@@ -195,14 +191,14 @@ class _TopBar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: const Color(0xFF26314F),
+          backgroundColor: const Color(0xFFD0EDE0),
           child: ClipOval(
             child: Container(
               width: 36,
               height: 36,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF54F2D1), Color(0xFF2D79FF)],
+                  colors: [Color(0xFF2D7A4F), Color(0xFF48C78A)],
                 ),
               ),
               child: const Icon(Icons.person, color: Colors.white, size: 18),
@@ -214,7 +210,7 @@ class _TopBar extends StatelessWidget {
           child: Text(
             'Halo, $userName!',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
+              color: const Color(0xFF1C3028),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -223,12 +219,12 @@ class _TopBar extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: const Color(0xFF1F2640),
+            color: const Color(0xFFEBF4E8),
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(
             Icons.notifications_none_rounded,
-            color: Colors.white70,
+            color: Color(0xFF4D7060),
           ),
         ),
       ],
@@ -255,15 +251,11 @@ class _DailyFatCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1C2038), Color(0xFF202B41), Color(0xFF11162A)],
-        ),
-        border: Border.all(color: Colors.white10),
+        color: const Color(0xFFFFFFFF),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
         boxShadow: const [
           BoxShadow(
-            color: Colors.black38,
+            color: Color(0x142D7A4F),
             blurRadius: 28,
             offset: Offset(0, 20),
           ),
@@ -275,7 +267,7 @@ class _DailyFatCard extends StatelessWidget {
           Text(
             'Daily Fat Target',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
+              color: const Color(0xFF1C3028),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -284,7 +276,7 @@ class _DailyFatCard extends StatelessWidget {
             'Keep it balanced today.',
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF4D7060)),
           ),
           const SizedBox(height: 16),
           LayoutBuilder(
@@ -297,7 +289,7 @@ class _DailyFatCard extends StatelessWidget {
                         _FatSummaryText(
                           consumedFat: consumedFat,
                           maxFat: maxFat,
-                          statusColor: const Color(0xFF35EFC4),
+                          statusColor: const Color(0xFF2D7A4F),
                         ),
                         const SizedBox(height: 16),
                         const Center(child: _ProgressRing(percent: 48)),
@@ -310,7 +302,7 @@ class _DailyFatCard extends StatelessWidget {
                           child: _FatSummaryText(
                             consumedFat: consumedFat,
                             maxFat: maxFat,
-                            statusColor: const Color(0xFF35EFC4),
+                            statusColor: const Color(0xFF2D7A4F),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -325,15 +317,15 @@ class _DailyFatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF141A2D),
+              color: const Color(0xFFEBF4E8),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: const Color(0xFFC8E2D0)),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.fact_check_outlined,
-                  color: Color(0xFF57F2CE),
+                  color: Color(0xFF2D7A4F),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -341,7 +333,7 @@ class _DailyFatCard extends StatelessWidget {
                   child: Text(
                     'Scan terakhir: ${latestScan.imagePath.split('/').last} • ${latestScan.status}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white70,
+                      color: const Color(0xFF4D7060),
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
@@ -358,13 +350,11 @@ class _DailyFatCard extends StatelessWidget {
               onPressed: () {
                 Navigator.of(
                   context,
-                ).push(MaterialPageRoute(builder: (_) => const ScannerPage()));
+                ).push(NoTransitionRoute(builder: (_) => const ScannerPage()));
               },
               icon: const Icon(Icons.qr_code_scanner_rounded),
               label: const Text('Scan Sekarang'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF44F0D2),
-                foregroundColor: const Color(0xFF0D1020),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 textStyle: const TextStyle(fontWeight: FontWeight.w800),
                 shape: RoundedRectangleBorder(
@@ -398,9 +388,9 @@ class _ProgressRing extends StatelessWidget {
             child: CircularProgressIndicator(
               value: percent / 100,
               strokeWidth: 10,
-              backgroundColor: const Color(0xFF2A324F),
+              backgroundColor: const Color(0xFFD0EDE0),
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF43F2D1),
+                Color(0xFF2D7A4F),
               ),
             ),
           ),
@@ -410,7 +400,7 @@ class _ProgressRing extends StatelessWidget {
               Text(
                 '$percent%',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
+                  color: const Color(0xFF1C3028),
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -418,7 +408,7 @@ class _ProgressRing extends StatelessWidget {
               const Text(
                 'Consumed',
                 style: TextStyle(
-                  color: Colors.white54,
+                  color: Color(0xFF4D7060),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -450,7 +440,7 @@ class _FatSummaryText extends StatelessWidget {
         Text(
           '${consumedFat}g',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: const Color(0xFF44F0D2),
+            color: const Color(0xFF2D7A4F),
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -458,7 +448,7 @@ class _FatSummaryText extends StatelessWidget {
         Text(
           '/ $maxFat g max',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Colors.white54,
+            color: const Color(0xFF4D7060),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -502,8 +492,8 @@ class _QuickStatCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        color: const Color(0xFF1B2139),
-        border: Border.all(color: Colors.white10),
+        color: const Color(0xFFFFFFFF),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,7 +503,7 @@ class _QuickStatCard extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white60,
+              color: const Color(0xFF9AB5A5),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -521,7 +511,7 @@ class _QuickStatCard extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white,
+              color: const Color(0xFF1C3028),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -557,17 +547,17 @@ class _RecentScanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tagColor = item.accentColor == const Color(0xFFFF5C6B)
-        ? const Color(0xFF2D1B27)
+        ? const Color(0xFFFFEBEE)
         : item.accentColor == const Color(0xFFFFC94D)
-        ? const Color(0xFF2C2816)
-        : const Color(0xFF152A25);
+        ? const Color(0xFFFFF8E1)
+        : const Color(0xFFE8F5E9);
 
     return Container(
       width: 170,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1F37),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -636,18 +626,25 @@ class _RecentScanCard extends StatelessWidget {
             Text(
               item.name,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
+                color: const Color(0xFF1C3028),
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 3),
             Row(
               children: [
-                const Icon(Icons.access_time, size: 12, color: Colors.white54),
+                const Icon(
+                  Icons.access_time,
+                  size: 12,
+                  color: Color(0xFF9AB5A5),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   item.time,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF4D7060),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -663,8 +660,8 @@ class _RecentScanCard extends StatelessWidget {
                 ),
                 _TagChip(
                   label: item.calories,
-                  background: const Color(0xFF26304B),
-                  textColor: Colors.white70,
+                  background: const Color(0xFFEBF4E8),
+                  textColor: const Color(0xFF4D7060),
                 ),
               ],
             ),
@@ -715,8 +712,8 @@ class _TipsCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: const Color(0xFF1A2038),
-        border: Border.all(color: Colors.white10),
+        color: const Color(0xFFFFFFFF),
+        border: Border.all(color: const Color(0xFFC8E2D0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -726,15 +723,15 @@ class _TipsCard extends StatelessWidget {
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF24314D),
+              color: const Color(0xFFD0EDE0),
               border: Border.all(
-                color: const Color(0xFF4FE9C9).withOpacity(0.25),
+                color: const Color(0xFF2D7A4F).withOpacity(0.25),
               ),
             ),
             child: const Icon(
               Icons.lightbulb_outline,
               size: 18,
-              color: Color(0xFF58EAC8),
+              color: Color(0xFF2D7A4F),
             ),
           ),
           const SizedBox(width: 12),
@@ -745,7 +742,7 @@ class _TipsCard extends StatelessWidget {
                 Text(
                   'Tips Hari Ini',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: const Color(0xFF1C3028),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -753,7 +750,7 @@ class _TipsCard extends StatelessWidget {
                 Text(
                   'Mengurangi makanan yang digoreng dan menggantinya dengan rebusan dapat memotong asupan lemak harian hingga 40%. Coba menu rebus untuk makan malam!',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
+                    color: const Color(0xFF4D7060),
                     height: 1.45,
                   ),
                 ),
