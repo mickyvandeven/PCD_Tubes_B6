@@ -495,22 +495,41 @@ class _CameraStreamView extends StatelessWidget {
               ),
             ),
           
-          // Tombol untuk kembali atau aksi tambahan
+          // Tombol aksi di bawah layar
           Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 80,
-            left: 0,
-            right: 0,
+            bottom: MediaQuery.of(context).padding.bottom + 40,
+            left: 30,
+            right: 30,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Tombol Batal/Tutup
                 FloatingActionButton(
+                  heroTag: 'close_btn',
+                  backgroundColor: AppColors.surfaceAlt.withOpacity(0.8),
+                  elevation: 0,
+                  onPressed: () => provider.reset(),
+                  child: const Icon(Icons.close_rounded, color: AppColors.white, size: 28),
+                ),
+                
+                // Tombol Capture / Save (sementara mock)
+                FloatingActionButton.large(
+                  heroTag: 'capture_btn',
                   backgroundColor: AppColors.primary,
+                  elevation: 4,
+                  shape: const CircleBorder(
+                    side: BorderSide(color: Colors.white24, width: 4),
+                  ),
                   onPressed: () {
-                    // Sementara ini, tombol ini bisa untuk "capture" jika mau, 
-                    // atau sekadar pause/stop (karena ML belum aktif)
-                    provider.reset(); 
+                    // TODO: Implementasi logika simpan hasil
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('📸 Fitur simpan hasil akan segera hadir!'),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
                   },
-                  child: const Icon(Icons.stop, color: AppColors.white, size: 32),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 36),
                 ),
               ],
             ),
