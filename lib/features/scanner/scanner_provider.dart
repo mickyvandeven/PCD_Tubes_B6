@@ -2,14 +2,16 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/scan_result_model.dart';
-import '../../data/services/camera_service.dart';
 import '../../data/services/hive_service.dart';
 import '../../data/services/ml_service.dart';
 import '../../data/services/nutrition_service.dart';
+import 'camera_service.dart';
+import 'inference_service.dart';
 
 enum ScanState {
   idle,
   picking,
+  streaming,
   analyzing,
   done,
   error,
@@ -25,12 +27,16 @@ class ScannerProvider extends ChangeNotifier {
   })  : _camera = cameraService ?? CameraService(),
         _ml = mlService ?? MlService(),
         _nutrition = nutritionService ?? NutritionService(),
-        _hive = hiveService ?? HiveService();
+        _hive = hiveService ?? HiveService() {
+    _inferenceService.onResult = _handleInferenceResult;
+    _inferenceService.init();
+  }
 
   final CameraService _camera;
   final MlService _ml;
   final NutritionService _nutrition;
   final HiveService _hive;
+  final InferenceService _inferenceService = InferenceService();
 
   ScanState _state = ScanState.idle;
   ScanState get state => _state;
@@ -47,17 +53,30 @@ class ScannerProvider extends ChangeNotifier {
   bool get isLoading =>
       _state == ScanState.picking || _state == ScanState.analyzing;
 
+  bool get isStreaming => _state == ScanState.streaming;
+
+  List<dynamic> _currentDetections = [];
+  List<dynamic> get currentDetections => _currentDetections;
+
+  // Expose camera controller for CameraPreview
+  get cameraController => _camera.controller;
+
   // ─── Public Methods ──────────────────────────────────────────────────────
 
-  /// Buka kamera dan lakukan scan
+  /// Buka kamera dan mulai stream
   Future<void> scanFromCamera() async {
-    _setState(ScanState.picking);
-    final file = await _camera.takePhoto();
-    if (file == null) {
-      _setState(ScanState.idle);
-      return;
+    try {
+      _setState(ScanState.picking);
+      await _camera.initialize();
+      _setState(ScanState.streaming);
+      // Memulai stream kamera, frame diproses di Background Isolate
+      await _camera.startStream((imageFrame) {
+        _inferenceService.runInference(imageFrame);
+      });
+    } catch (e) {
+      _errorMessage = 'Gagal membuka kamera: $e';
+      _setState(ScanState.error);
     }
-    await _processImage(file);
   }
 
   /// Pilih dari galeri dan lakukan scan
@@ -105,10 +124,19 @@ class ScannerProvider extends ChangeNotifier {
 
   /// Reset ke idle
   void reset() {
+    _camera.stopStream();
+    _currentDetections.clear();
     _imageFile = null;
     _result = null;
     _errorMessage = '';
     _setState(ScanState.idle);
+  }
+
+  @override
+  void dispose() {
+    _inferenceService.dispose();
+    _camera.dispose();
+    super.dispose();
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────
@@ -166,6 +194,12 @@ class ScannerProvider extends ChangeNotifier {
 
   void _setState(ScanState state) {
     _state = state;
+    notifyListeners();
+  }
+
+  void _handleInferenceResult(InferenceResult result) {
+    if (!isStreaming) return;
+    _currentDetections = result.detections;
     notifyListeners();
   }
 }

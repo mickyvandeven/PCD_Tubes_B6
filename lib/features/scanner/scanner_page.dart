@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:camera/camera.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../data/models/scan_result_model.dart';
+import 'bounding_box_painter.dart';
 import 'scanner_provider.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -23,15 +26,49 @@ class ScannerPage extends StatelessWidget {
   }
 }
 
-class _ScannerView extends StatelessWidget {
+class _ScannerView extends StatefulWidget {
   const _ScannerView();
+
+  @override
+  State<_ScannerView> createState() => _ScannerViewState();
+}
+
+class _ScannerViewState extends State<_ScannerView> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final provider = context.read<ScannerProvider>();
+    if (!provider.isStreaming) return; // Only handle lifecycle if streaming
+
+    final controller = provider.cameraController as CameraController?;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    if (state == AppLifecycleState.inactive) {
+      // Bebaskan kamera saat inactive
+      provider.reset();
+    } else if (state == AppLifecycleState.resumed) {
+      // Inisialisasi kembali
+      provider.scanFromCamera();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScannerProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1020),
+      backgroundColor: AppColors.background,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -44,12 +81,13 @@ class _ScannerView extends StatelessWidget {
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
             ),
             child: const Icon(
               Icons.arrow_back_ios_new,
-              color: Colors.white,
+              color: AppColors.textPrimary,
               size: 18,
             ),
           ),
@@ -57,7 +95,7 @@ class _ScannerView extends StatelessWidget {
         title: const Text(
           'FAT SCAN',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w800,
             fontSize: 18,
             letterSpacing: 2,
@@ -75,6 +113,8 @@ class _ScannerView extends StatelessWidget {
         return _IdleView();
       case ScanState.picking:
         return _LoadingView(message: 'Memilih gambar...');
+      case ScanState.streaming:
+        return const _CameraStreamView();
       case ScanState.analyzing:
         return _LoadingView(message: 'AI sedang menganalisis makanan...');
       case ScanState.done:
@@ -99,13 +139,7 @@ class _IdleView extends StatelessWidget {
     final provider = context.read<ScannerProvider>();
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF11162A), Color(0xFF0D1020), Color(0xFF111830)],
-        ),
-      ),
+      color: AppColors.background,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -118,7 +152,7 @@ class _IdleView extends StatelessWidget {
               Text(
                 'Scan Makananmu',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -127,7 +161,7 @@ class _IdleView extends StatelessWidget {
                 'Arahkan kamera ke makananmu.\nAI akan mendeteksi kadar lemak secara otomatis.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white54,
+                  color: AppColors.textSecondary,
                   height: 1.5,
                 ),
               ),
@@ -140,7 +174,7 @@ class _IdleView extends StatelessWidget {
                 icon: Icons.camera_alt_rounded,
                 label: 'Buka Kamera',
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF44F0D2), Color(0xFF2D79FF)],
+                  colors: AppColors.primaryGradient,
                 ),
                 onTap: () => provider.scanFromCamera(),
               ),
@@ -149,7 +183,7 @@ class _IdleView extends StatelessWidget {
                 icon: Icons.photo_library_rounded,
                 label: 'Pilih dari Galeri',
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF2D79FF), Color(0xFF7B5EA7)],
+                  colors: AppColors.accentGradient,
                 ),
                 onTap: () => provider.scanFromGallery(),
               ),
@@ -430,6 +464,63 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
+// ─── Camera Stream View ───────────────────────────────────────────────────────
+
+class _CameraStreamView extends StatelessWidget {
+  const _CameraStreamView();
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ScannerProvider>();
+    final controller = provider.cameraController as CameraController?;
+
+    if (controller == null || !controller.value.isInitialized) {
+      return const _LoadingView(message: 'Membuka kamera...');
+    }
+
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CameraPreview(controller),
+          
+          // Gambar Bounding Box dari hasil AI Mock
+          if (provider.currentDetections.isNotEmpty)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: BoundingBoxPainter(
+                  detections: provider.currentDetections,
+                ),
+              ),
+            ),
+          
+          // Tombol untuk kembali atau aksi tambahan
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 80,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FloatingActionButton(
+                  backgroundColor: AppColors.primary,
+                  onPressed: () {
+                    // Sementara ini, tombol ini bisa untuk "capture" jika mau, 
+                    // atau sekadar pause/stop (karena ML belum aktif)
+                    provider.reset(); 
+                  },
+                  child: const Icon(Icons.stop, color: AppColors.white, size: 32),
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Loading View ─────────────────────────────────────────────────────────────
 
 class _LoadingView extends StatelessWidget {
@@ -439,13 +530,7 @@ class _LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF11162A), Color(0xFF0D1020)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      color: AppColors.background,
       child: SafeArea(
         child: Center(
           child: Column(
@@ -457,11 +542,11 @@ class _LoadingView extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF44F0D2), Color(0xFF2D79FF)],
+                    colors: AppColors.primaryGradient,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF44F0D2).withOpacity(0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 24,
                     ),
                   ],
@@ -469,7 +554,7 @@ class _LoadingView extends StatelessWidget {
                 child: const Padding(
                   padding: EdgeInsets.all(20),
                   child: CircularProgressIndicator(
-                    color: Colors.white,
+                    color: AppColors.white,
                     strokeWidth: 3,
                   ),
                 ),
@@ -478,7 +563,7 @@ class _LoadingView extends StatelessWidget {
               Text(
                 message,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -486,7 +571,7 @@ class _LoadingView extends StatelessWidget {
               const SizedBox(height: 8),
               const Text(
                 'Mohon tunggu sebentar...',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
           ),
@@ -506,7 +591,7 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.read<ScannerProvider>();
     return Container(
-      color: const Color(0xFF0D1020),
+      color: AppColors.background,
       child: SafeArea(
         child: Center(
           child: Padding(
@@ -516,7 +601,7 @@ class _ErrorView extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.error_outline_rounded,
-                  color: Color(0xFFFF5C6B),
+                  color: AppColors.error,
                   size: 60,
                 ),
                 const SizedBox(height: 20),
@@ -542,8 +627,8 @@ class _ErrorView extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () => provider.reset(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF44F0D2),
-                    foregroundColor: const Color(0xFF0D1020),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 32,
                       vertical: 14,
@@ -581,13 +666,7 @@ class _ResultView extends StatelessWidget {
     final provider = context.read<ScannerProvider>();
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF11162A), Color(0xFF0D1020)],
-        ),
-      ),
+      color: AppColors.background,
       child: SafeArea(
         child: Column(
           children: [
@@ -607,7 +686,7 @@ class _ResultView extends StatelessWidget {
                     Text(
                       'Makanan Terdeteksi',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -637,7 +716,7 @@ class _ResultView extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('✅ Scan disimpan ke riwayat!'),
-                      backgroundColor: Color(0xFF1B2040),
+                      backgroundColor: AppColors.primary,
                     ),
                   );
                   provider.reset();
@@ -668,7 +747,7 @@ class _ImagePreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF44F0D2).withOpacity(0.15),
+            color: AppColors.primary.withOpacity(0.15),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -700,7 +779,7 @@ class _ImagePreview extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF44F0D2),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
@@ -708,14 +787,14 @@ class _ImagePreview extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.auto_awesome,
-                      color: Color(0xFF0D1020),
+                      color: AppColors.white,
                       size: 12,
                     ),
                     SizedBox(width: 4),
                     Text(
                       'AI Analyzed',
                       style: TextStyle(
-                        color: Color(0xFF0D1020),
+                        color: AppColors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
@@ -746,18 +825,18 @@ class _FatStatusBanner extends StatelessWidget {
 
     switch (fatStatus) {
       case FatStatus.low:
-        primaryColor = const Color(0xFF44F0D2);
-        bgColor = const Color(0xFF0D2E29);
+        primaryColor = AppColors.fatLow;
+        bgColor = AppColors.fatLow.withOpacity(0.1);
         statusIcon = Icons.check_circle_outline_rounded;
         break;
       case FatStatus.medium:
-        primaryColor = const Color(0xFFFFC94D);
-        bgColor = const Color(0xFF2C2210);
+        primaryColor = AppColors.fatMedium;
+        bgColor = AppColors.fatMedium.withOpacity(0.1);
         statusIcon = Icons.warning_amber_rounded;
         break;
       case FatStatus.high:
-        primaryColor = const Color(0xFFFF5C6B);
-        bgColor = const Color(0xFF2D1217);
+        primaryColor = AppColors.fatHigh;
+        bgColor = AppColors.fatHigh.withOpacity(0.1);
         statusIcon = Icons.dangerous_rounded;
         break;
     }
@@ -836,7 +915,7 @@ class _FatStatusBanner extends StatelessWidget {
                     Text(
                       '${result.totalCalories.toStringAsFixed(0)} kcal',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
@@ -844,7 +923,7 @@ class _FatStatusBanner extends StatelessWidget {
                     Text(
                       '${result.foods.length} makanan',
                       style: const TextStyle(
-                        color: Colors.white38,
+                        color: AppColors.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -858,18 +937,18 @@ class _FatStatusBanner extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF5C6B).withOpacity(0.15),
+                color: AppColors.fatHigh.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFFFF5C6B), size: 14),
+                  Icon(Icons.info_outline, color: AppColors.fatHigh, size: 14),
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Makanan ini mengandung lemak tinggi. Perhatikan asupan harianmu!',
                       style: TextStyle(
-                        color: Color(0xFFFF5C6B),
+                        color: AppColors.fatHigh,
                         fontSize: 12,
                         height: 1.4,
                       ),
@@ -934,9 +1013,9 @@ class _FoodItemCardState extends State<_FoodItemCard> {
 
   Color get _fatColor {
     final f = widget.food.fat;
-    if (f > 20) return const Color(0xFFFF5C6B);
-    if (f >= 8) return const Color(0xFFFFC94D);
-    return const Color(0xFF44F0D2);
+    if (f > 20) return AppColors.fatHigh;
+    if (f >= 8) return AppColors.fatMedium;
+    return AppColors.fatLow;
   }
 
   @override
@@ -946,9 +1025,9 @@ class _FoodItemCardState extends State<_FoodItemCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1F37),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,7 +1056,7 @@ class _FoodItemCardState extends State<_FoodItemCard> {
                     Text(
                       food.name,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
@@ -985,7 +1064,7 @@ class _FoodItemCardState extends State<_FoodItemCard> {
                     Text(
                       'Confidence: ${(food.confidence * 100).toStringAsFixed(0)}%',
                       style: const TextStyle(
-                        color: Colors.white38,
+                        color: AppColors.textHint,
                         fontSize: 11,
                       ),
                     ),
@@ -1017,7 +1096,7 @@ class _FoodItemCardState extends State<_FoodItemCard> {
             children: [
               const Text(
                 'Gram:',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               const SizedBox(width: 10),
               // Minus button
@@ -1044,7 +1123,7 @@ class _FoodItemCardState extends State<_FoodItemCard> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
@@ -1055,31 +1134,31 @@ class _FoodItemCardState extends State<_FoodItemCard> {
                       horizontal: 8,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFF111830),
+                    fillColor: AppColors.surfaceAlt,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(
-                        color: Colors.white24,
+                        color: AppColors.border,
                         width: 1,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(
-                        color: Colors.white24,
+                        color: AppColors.border,
                         width: 1,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                        color: _fatColor.withOpacity(0.6),
+                        color: _fatColor,
                         width: 1.5,
                       ),
                     ),
                     suffix: const Text(
                       'g',
-                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
                     ),
                   ),
                   onTap: () => setState(() => _isEditing = true),
@@ -1110,14 +1189,14 @@ class _FoodItemCardState extends State<_FoodItemCard> {
                   Text(
                     '${food.calories.toStringAsFixed(0)} kcal',
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: AppColors.textSecondary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const Text(
                     'Kalori',
-                    style: TextStyle(color: Colors.white38, fontSize: 11),
+                    style: TextStyle(color: AppColors.textHint, fontSize: 11),
                   ),
                 ],
               ),
@@ -1143,11 +1222,11 @@ class _GramButton extends StatelessWidget {
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: const Color(0xFF252D4A),
+          color: AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Icon(icon, color: Colors.white70, size: 16),
+        child: Icon(icon, color: AppColors.textSecondary, size: 16),
       ),
     );
   }
@@ -1164,38 +1243,34 @@ class _TotalSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1C2038), Color(0xFF141A2E)],
-        ),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           _SummaryRow(
             icon: Icons.water_drop_rounded,
-            iconColor: const Color(0xFF44F0D2),
+            iconColor: AppColors.fatLow,
             label: 'Total Lemak',
             value: '${result.totalFat.toStringAsFixed(1)} g',
-            valueColor: const Color(0xFF44F0D2),
+            valueColor: AppColors.fatLow,
           ),
-          const Divider(color: Colors.white10, height: 20),
+          const Divider(color: AppColors.divider, height: 20),
           _SummaryRow(
             icon: Icons.local_fire_department_rounded,
-            iconColor: const Color(0xFFFFC94D),
+            iconColor: AppColors.fatMedium,
             label: 'Total Kalori',
             value: '${result.totalCalories.toStringAsFixed(0)} kcal',
-            valueColor: const Color(0xFFFFC94D),
+            valueColor: AppColors.fatMedium,
           ),
-          const Divider(color: Colors.white10, height: 20),
+          const Divider(color: AppColors.divider, height: 20),
           _SummaryRow(
             icon: Icons.fastfood_rounded,
-            iconColor: Colors.white54,
+            iconColor: AppColors.textHint,
             label: 'Jumlah Makanan',
             value: '${result.foods.length} item',
-            valueColor: Colors.white70,
+            valueColor: AppColors.textSecondary,
           ),
         ],
       ),
@@ -1226,7 +1301,7 @@ class _SummaryRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           label,
-          style: const TextStyle(color: Colors.white54, fontSize: 14),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
         ),
         const Spacer(),
         Text(
@@ -1255,8 +1330,8 @@ class _ResultActionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1020),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+        color: AppColors.background,
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: Row(
         children: [
@@ -1267,8 +1342,8 @@ class _ResultActionBar extends StatelessWidget {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Scan Ulang'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white70,
-                side: const BorderSide(color: Colors.white24),
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.border),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -1285,8 +1360,8 @@ class _ResultActionBar extends StatelessWidget {
               icon: const Icon(Icons.save_rounded, size: 18),
               label: const Text('Simpan Hasil'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF44F0D2),
-                foregroundColor: const Color(0xFF0D1020),
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 textStyle: const TextStyle(fontWeight: FontWeight.w800),
                 shape: RoundedRectangleBorder(

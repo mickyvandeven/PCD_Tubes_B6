@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/hive_service.dart';
 import 'features/history/history_page.dart';
@@ -12,6 +13,9 @@ import 'features/scanner/scanner_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Muat konfigurasi dari .env
+  await dotenv.load(fileName: ".env");
 
   // Inisialisasi Hive untuk penyimpanan riwayat scan
   await HiveService.init();
