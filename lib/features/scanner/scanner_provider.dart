@@ -90,6 +90,52 @@ class ScannerProvider extends ChangeNotifier {
     await _processImage(file);
   }
 
+  /// Menangkap hasil deteksi dari kamera live stream saat ini
+  Future<void> captureFrame() async {
+    if (!isStreaming) return;
+    
+    _setState(ScanState.analyzing);
+    _camera.stopStream(); // Hentikan stream
+
+    try {
+      List<DetectedFood> detected = [];
+      
+      if (_currentDetections.isNotEmpty) {
+        // Ambil data hasil AI dari Isolate
+        for (var d in _currentDetections) {
+          detected.add(DetectedFood(
+            name: d['label'],
+            confidence: d['confidence'],
+          ));
+        }
+      } else {
+        // Fallback jika tombol ditekan saat AI belum menangkap apa-apa
+        detected = _getFallbackFoods();
+      }
+
+      // Buat detail nutrisi untuk setiap makanan
+      final foods = detected.map((d) {
+        return _nutrition.createFoodItem(d.name, confidence: d.confidence);
+      }).toList();
+
+      final totalFat = foods.fold(0.0, (s, f) => s + f.fat);
+      final fatStatus = _nutrition.getFatStatus(totalFat);
+
+      _result = ScanResultModel(
+        id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
+        tanggal: DateTime.now(),
+        imagePath: '', // Gambar tidak disimpan secara fisik saat ini
+        foods: foods,
+        status: fatStatus.shortLabel,
+      );
+
+      _setState(ScanState.done);
+    } catch (e) {
+      _errorMessage = 'Gagal menangkap frame: $e';
+      _setState(ScanState.error);
+    }
+  }
+
   /// Update gram makanan pada index tertentu dan hitung ulang
   void updateGram(int index, double newGram) {
     if (_result == null) return;

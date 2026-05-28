@@ -521,13 +521,7 @@ class _CameraStreamView extends StatelessWidget {
                     side: BorderSide(color: Colors.white24, width: 4),
                   ),
                   onPressed: () {
-                    // TODO: Implementasi logika simpan hasil
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('📸 Fitur simpan hasil akan segera hadir!'),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
+                    provider.captureFrame();
                   },
                   child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 36),
                 ),
