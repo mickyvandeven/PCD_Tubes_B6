@@ -1,115 +1,110 @@
-import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:math' as math;
-
+import 'package:flutter/services.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:image/image.dart' as img;
 import 'frame_preprocessor.dart';
+import 'result_parser.dart';
 
-/// Pesan yang dikirim dari Main Thread ke Isolate
-class InferenceRequest {
-  final int width;
-  final int height;
-  // TODO: Di produksi nyata, kirim List<Uint8List> planes.bytes
-  // final List<Uint8List> planes;
-  InferenceRequest(this.width, this.height);
-}
-
-/// Pesan yang dikirim dari Isolate ke Main Thread
 class InferenceResult {
   final List<dynamic> detections;
   InferenceResult(this.detections);
 }
 
-/// Layer 2: Inference Engine
-/// Menggunakan Isolate.spawn untuk menjalankan model ML secara paralel
-/// agar UI kamera tidak patah-patah (stuttering).
+/// InferenceService — Jalankan model TFLite langsung di main thread
+/// untuk debugging. Setelah terbukti jalan, bisa dipindah ke Isolate.
 class InferenceService {
-  Isolate? _isolate;
-  SendPort? _sendPort;
-  final ReceivePort _receivePort = ReceivePort();
+  Interpreter? _interpreter;
   bool _isProcessing = false;
+  bool _isReady = false;
   
   Function(InferenceResult)? onResult;
 
-  /// Inisialisasi Isolate dan siapkan komunikasi
   Future<void> init() async {
-    _receivePort.listen((message) {
-      if (message is SendPort) {
-        // Menerima port dari isolate untuk bisa mengirim data ke sana
-        _sendPort = message;
-      } else if (message is InferenceResult) {
-        // Menerima hasil deteksi
-        _isProcessing = false;
-        onResult?.call(message);
-      }
-    });
-
     try {
-      _isolate = await Isolate.spawn(_isolateEntry, _receivePort.sendPort);
+      _interpreter = await Interpreter.fromAsset('assets/models/fatscan_v2.tflite');
+      
+      debugPrint('=== MODEL LOADED ===');
+      for (var t in _interpreter!.getInputTensors()) {
+        debugPrint('INPUT -> Name: ${t.name}, Shape: ${t.shape}, Type: ${t.type}');
+      }
+      for (var t in _interpreter!.getOutputTensors()) {
+        debugPrint('OUTPUT -> Name: ${t.name}, Shape: ${t.shape}, Type: ${t.type}');
+      }
+      
+      _isReady = true;
     } catch (e) {
-      debugPrint('Error spawning isolate: $e');
+      debugPrint('❌ Error loading model: $e');
+      _isReady = false;
     }
   }
 
-  /// Eksekusi inferensi pada frame kamera
-  void runInference(CameraImage image) {
-    if (_sendPort == null || _isProcessing) return;
-    
-    // Cegah penumpukan frame jika Isolate masih memproses frame sebelumnya
+  void runInference(CameraImage image, [int rotation = 0]) {
+    if (!_isReady || _interpreter == null || _isProcessing) return;
     _isProcessing = true;
     
-    // Kirim request ke Isolate
-    _sendPort!.send(InferenceRequest(image.width, image.height));
+    try {
+      // 1. Konversi YUV420/BGRA ke RGB Image penuh warna!
+      final planes = image.planes.map((p) => p.bytes).toList();
+      final bytesPerRow = image.planes.map((p) => p.bytesPerRow).toList();
+      final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+      
+      img.Image? colorImage = FramePreprocessor.convertBytesToImage(
+        planes, bytesPerRow, image.width, image.height, isIOS
+      );
+      
+      if (colorImage == null) {
+        _isProcessing = false;
+        return;
+      }
+      
+      // 2. Rotate 90 derajat jika di Android (portrait)
+      if (!isIOS) {
+        colorImage = img.copyRotate(colorImage, angle: 90);
+      }
+      
+      // 3. Buat tensor input menggunakan FramePreprocessor
+      final inputTensor = _interpreter!.getInputTensors().first;
+      final isQuantized = inputTensor.type == TensorType.uint8 || inputTensor.type == TensorType.int8;
+      
+      var inputData = FramePreprocessor.imageToTensor(colorImage, 224, isQuantized);
+      
+      // 5. Setup output buffer [1, 33, 1029]
+      final outputTensor = _interpreter!.getOutputTensors().first;
+      final outputShape = outputTensor.shape; // [1, 33, 1029]
+      
+      var outputData = List.generate(
+        outputShape[0],
+        (_) => List.generate(
+          outputShape[1],
+          (_) => List.filled(outputShape[2], 0.0),
+        ),
+      );
+      
+      // 6. Run!
+      _interpreter!.run(inputData, outputData);
+      
+      // 7. Parse (Naikkan threshold ke 40% agar tidak asal tebak)
+      final detections = ResultParser.parseYolo(outputData, 0.40);
+      
+      debugPrint('🔍 Detections: ${detections.length}');
+      for (var d in detections) {
+        debugPrint('  -> ${d['label']} (${(d['confidence'] * 100).toStringAsFixed(1)}%)');
+      }
+      
+      onResult?.call(InferenceResult(detections));
+    } catch (e) {
+      debugPrint('❌ Inference error: $e');
+      onResult?.call(InferenceResult([]));
+    } finally {
+      _isProcessing = false;
+    }
   }
 
   void dispose() {
-    _receivePort.close();
-    _isolate?.kill(priority: Isolate.immediate);
-    _isolate = null;
-  }
-
-  // ─── Entry Point Isolate (Berjalan di Background Thread) ──────────────────
-  
-  static void _isolateEntry(SendPort mainSendPort) {
-    final isolateReceivePort = ReceivePort();
-    mainSendPort.send(isolateReceivePort.sendPort);
-    
-    // TODO: Inisialisasi model tflite_flutter.Interpreter di sini
-    
-    final random = math.Random();
-
-    isolateReceivePort.listen((message) async {
-      if (message is InferenceRequest) {
-        // Simulasi Preprocessing (memakan waktu ~20ms)
-        await Future.delayed(const Duration(milliseconds: 20));
-        
-        // Simulasi TFLite Inference (memakan waktu ~80ms)
-        await Future.delayed(const Duration(milliseconds: 80));
-        
-        // MOCKUP HASIL DETEKSI AI
-        // Mengembalikan koordinat acak dan label acak untuk simulasi
-        final mockResults = [];
-        
-        // 30% chance untuk mendeteksi makanan (agar terlihat realistis)
-        if (random.nextDouble() > 0.7) {
-          final isSalad = random.nextBool();
-          mockResults.add({
-            'label': isSalad ? 'Salad Sayur' : 'Daging Sapi',
-            'confidence': 0.85 + (random.nextDouble() * 0.1), // 85% - 95%
-            'fat': isSalad ? 2.5 : 22.0,
-            'calories': isSalad ? 120.0 : 450.0,
-            'bbox': [
-              0.2 + random.nextDouble() * 0.1, // left
-              0.3 + random.nextDouble() * 0.1, // top
-              0.7 + random.nextDouble() * 0.1, // right
-              0.8 + random.nextDouble() * 0.1, // bottom
-            ]
-          });
-        }
-
-        // Kirim hasil kembali ke Main Thread
-        mainSendPort.send(InferenceResult(mockResults));
-      }
-    });
+    _interpreter?.close();
+    _interpreter = null;
+    _isReady = false;
   }
 }

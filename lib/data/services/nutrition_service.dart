@@ -65,6 +65,21 @@ const Map<String, Map<String, double>> nutritionDatabase = {
 
   // ─── Default ─────────────────────────────────────────────────────────────
   'Makanan Tidak Dikenal': {'defaultGram': 100, 'fat': 5.0, 'calories': 150},
+  
+  // ─── Tambahan dari Model YOLOv8 ──────────────────────────────────────────
+  'Apple': {'defaultGram': 150, 'fat': 0.3, 'calories': 78},
+  'Banana': {'defaultGram': 100, 'fat': 0.3, 'calories': 89},
+  'Chocolate Chip Cookie': {'defaultGram': 30, 'fat': 7.0, 'calories': 148},
+  'Kiwi': {'defaultGram': 70, 'fat': 0.4, 'calories': 42},
+  'Nugget': {'defaultGram': 100, 'fat': 15.0, 'calories': 295},
+  'Pempek': {'defaultGram': 100, 'fat': 5.0, 'calories': 200},
+  'Pineapples': {'defaultGram': 100, 'fat': 0.1, 'calories': 50},
+  'Rendang Sapi': {'defaultGram': 100, 'fat': 15.0, 'calories': 250},
+  'Sate': {'defaultGram': 100, 'fat': 11.0, 'calories': 225}, // Sate ayam rata-rata
+  'Spaghetti': {'defaultGram': 200, 'fat': 8.0, 'calories': 350},
+  'Strawberry': {'defaultGram': 100, 'fat': 0.3, 'calories': 32},
+  'Terong Balado': {'defaultGram': 100, 'fat': 8.0, 'calories': 120},
+  'Tumis Kangkung': {'defaultGram': 100, 'fat': 3.0, 'calories': 85},
 };
 
 /// Service untuk menghitung nutrisi makanan
