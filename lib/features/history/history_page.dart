@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/scan_result_model.dart';
+import '../../data/repositories/history_repository.dart';
 import '../../data/services/hive_service.dart';
 import '../../widgets/fat_bottom_nav.dart';
 
@@ -11,10 +12,16 @@ class HistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hive = context.read<HiveService>();
-    final scans = hive.getAllScans();
-
-    final weeklyValues = <double>[12, 14, 13, 20, 8, 35, 22];
+    final historyRepository = HistoryRepository(
+      hiveService: context.read<HiveService>(),
+    );
+    final scans = historyRepository.getAllHistory();
+    final weeklyValues = historyRepository.getWeeklyFatAverage();
+    final weeklyAverage = weeklyValues.isEmpty
+        ? 0
+        : (weeklyValues.fold(0.0, (sum, value) => sum + value) /
+                weeklyValues.length)
+            .round();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8F2),
@@ -56,7 +63,10 @@ class HistoryPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _SummaryCard(weeklyAverage: 32, chartValues: weeklyValues),
+                _SummaryCard(
+                  weeklyAverage: weeklyAverage,
+                  chartValues: weeklyValues,
+                ),
                 const SizedBox(height: 20),
                 // Real scan history from Hive
                 if (scans.isNotEmpty) ...[
