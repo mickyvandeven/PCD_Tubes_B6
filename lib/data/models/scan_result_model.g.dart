@@ -1,11 +1,10 @@
-// lib/data/models/scan_result_model.g.dart
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Dibuat manual karena tidak menjalankan build_runner
-// Ini stub agar kode dapat dikompilasi tanpa code generation
 
 part of 'scan_result_model.dart';
 
-// ─── FoodItem Adapter ────────────────────────────────────────────────────────
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
 
 class FoodItemAdapter extends TypeAdapter<FoodItem> {
   @override
@@ -19,11 +18,11 @@ class FoodItemAdapter extends TypeAdapter<FoodItem> {
     };
     return FoodItem(
       name: fields[0] as String,
-      grams: (fields[1] as num).toDouble(),
-      defaultGrams: (fields[2] as num).toDouble(),
-      defaultFat: (fields[3] as num).toDouble(),
-      defaultCalories: (fields[4] as num).toDouble(),
-      confidence: (fields[5] as num? ?? 1.0).toDouble(),
+      grams: fields[1] as double,
+      defaultGrams: fields[2] as double,
+      defaultFat: fields[3] as double,
+      defaultCalories: fields[4] as double,
+      confidence: fields[5] as double,
     );
   }
 
@@ -55,8 +54,6 @@ class FoodItemAdapter extends TypeAdapter<FoodItem> {
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
-
-// ─── ScanResultModel Adapter ─────────────────────────────────────────────────
 
 class ScanResultModelAdapter extends TypeAdapter<ScanResultModel> {
   @override

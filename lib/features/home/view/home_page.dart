@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/models/scan_result_model.dart';
+import '../../../data/models/user_profile_model.dart';
+import '../../../data/services/hive_service.dart';
 import '../../../data/services/nutrition_service.dart';
 import '../../../widgets/fat_bottom_nav.dart';
 import '../../history/history_page.dart';
@@ -9,22 +11,34 @@ import '../../profile/profile_page.dart';
 import '../../scanner/scanner_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.userName = 'Ridho'});
+  const HomePage({super.key});
 
-  final String userName;
-
-  double _fatPercentage(int consumed, int max) => (consumed / max) * 100;
+  double _fatPercentage(double consumed, double max) =>
+      max > 0 ? (consumed / max) * 100 : 0;
 
   @override
   Widget build(BuildContext context) {
+    final hive = HiveService();
+    final UserProfile? profile = hive.getProfile();
+    final String userName = profile?.nama ?? 'Pengguna';
+    final double maxFat = profile?.targetLemakHarian ?? 65.0;
+    final double consumedFat = hive.getTodayTotalFat();
+    final int todayScanCount = hive.getTodayScanCount();
+    final double avgFat = hive.getAverageFat();
+    final int percent = _fatPercentage(consumedFat, maxFat).round().clamp(0, 100);
+
+    // Gunakan scan hari ini jika ada, fallback ke dummy
+    final todayScans = hive.getTodayScans();
     final nutritionSvc = NutritionService();
-    final latestScan = ScanResultModel(
-      id: 'scan-001',
-      tanggal: DateTime(2026, 5, 21),
-      imagePath: 'assets/images/salad.jpg',
-      foods: [nutritionSvc.createFoodItem('Salad', confidence: 0.95)],
-      status: 'Low Fat',
-    );
+    final latestScan = todayScans.isNotEmpty
+        ? todayScans.first
+        : ScanResultModel(
+            id: 'scan-demo',
+            tanggal: DateTime.now(),
+            imagePath: 'assets/images/salad.jpg',
+            foods: [nutritionSvc.createFoodItem('Salad', confidence: 0.95)],
+            status: 'Low Fat',
+          );
 
     final recentScans = <_RecentScanItem>[
       const _RecentScanItem(
@@ -52,10 +66,6 @@ class HomePage extends StatelessWidget {
         icon: Icons.lunch_dining,
       ),
     ];
-
-    final consumedFat = 24;
-    const maxFat = 50;
-    final percent = _fatPercentage(consumedFat, maxFat).round();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8F2),
@@ -103,26 +113,26 @@ class HomePage extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: Column(
-                        children: const [
+                        children: [
                           _QuickStatCard(
                             icon: Icons.restaurant_menu,
-                            iconColor: Color(0xFF2D7A4F),
+                            iconColor: const Color(0xFF2D7A4F),
                             title: 'Scanned Today',
-                            value: '4 items',
+                            value: '$todayScanCount items',
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           _QuickStatCard(
                             icon: Icons.water_drop_outlined,
-                            iconColor: Color(0xFFB8D34B),
+                            iconColor: const Color(0xFFB8D34B),
                             title: 'Avg Fat',
-                            value: '8g /meal',
+                            value: '${avgFat.toStringAsFixed(1)}g',
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           _QuickStatCard(
-                            icon: Icons.local_fire_department_outlined,
-                            iconColor: Color(0xFFFFC947),
-                            title: 'Streak',
-                            value: '5 hari',
+                            icon: Icons.track_changes_rounded,
+                            iconColor: const Color(0xFFFFC947),
+                            title: 'Target',
+                            value: '${maxFat.toStringAsFixed(0)}g',
                           ),
                         ],
                       ),
@@ -228,8 +238,8 @@ class _DailyFatCard extends StatelessWidget {
     required this.latestScan,
   });
 
-  final int consumedFat;
-  final int maxFat;
+  final double consumedFat;
+  final double maxFat;
   final int percent;
   final ScanResultModel latestScan;
 
@@ -412,8 +422,8 @@ class _FatSummaryText extends StatelessWidget {
     required this.statusColor,
   });
 
-  final int consumedFat;
-  final int maxFat;
+  final double consumedFat;
+  final double maxFat;
   final Color statusColor;
 
   @override
@@ -422,7 +432,7 @@ class _FatSummaryText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${consumedFat}g',
+          '${consumedFat.toStringAsFixed(1)}g',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             color: const Color(0xFF2D7A4F),
             fontWeight: FontWeight.w800,
@@ -430,7 +440,7 @@ class _FatSummaryText extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '/ $maxFat g max',
+          '/ ${maxFat.toStringAsFixed(0)} g target',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xFF4D7060),
             fontWeight: FontWeight.w600,

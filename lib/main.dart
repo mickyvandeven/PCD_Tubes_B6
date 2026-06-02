@@ -8,6 +8,7 @@ import 'data/services/hive_service.dart';
 import 'features/history/history_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/onboarding/onboarding_page.dart';
+import 'features/onboarding/profile_setup_page.dart';
 import 'features/profile/profile_page.dart';
 import 'features/scanner/scanner_page.dart';
 
@@ -17,7 +18,7 @@ void main() async {
   // Muat konfigurasi dari .env
   await dotenv.load(fileName: ".env");
 
-  // Inisialisasi Hive untuk penyimpanan riwayat scan
+  // Inisialisasi Hive untuk penyimpanan riwayat scan & profil user
   await HiveService.init();
 
   runApp(const FatScanApp());
@@ -36,8 +37,22 @@ class FatScanApp extends StatelessWidget {
         pageBuilder: (_, __) => const NoTransitionPage(child: OnboardingPage()),
       ),
       GoRoute(
+        path: '/profile-setup',
+        pageBuilder: (_, state) {
+          final isEdit = state.uri.queryParameters['edit'] == 'true';
+          return NoTransitionPage(child: ProfileSetupPage(isEdit: isEdit));
+        },
+      ),
+      GoRoute(
         path: '/home',
         pageBuilder: (_, __) => const NoTransitionPage(child: HomePage()),
+        redirect: (context, state) {
+          // Redirect ke profile-setup jika belum ada profil
+          if (!HiveService().hasProfile()) {
+            return '/profile-setup';
+          }
+          return null;
+        },
       ),
       GoRoute(
         path: '/history',
