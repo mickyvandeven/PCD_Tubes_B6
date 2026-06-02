@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 
 import '../../data/models/scan_result_model.dart';
 import '../../data/repositories/history_repository.dart';
 import '../../data/services/hive_service.dart';
+import '../../data/services/mongo_service.dart';
 import '../../widgets/fat_bottom_nav.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -113,28 +115,54 @@ class _HistoryPageState extends State<HistoryPage> {
                   ...scans.map(
                     (scan) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _ScanHistoryCard(scan: scan),
+                      child: Dismissible(
+                        key: Key(scan.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.delete_rounded, color: Colors.white),
+                        ),
+                        onDismissed: (_) async {
+                          await HiveService().deleteScan(scan.id);
+                          MongoService().deleteScan(scan.id);
+                          setState(() {});
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Riwayat berhasil dihapus'),
+                                backgroundColor: Color(0xFF1C3028),
+                              ),
+                            );
+                          }
+                        },
+                        child: _ScanHistoryCard(scan: scan),
+                      ),
                     ),
                   ),
                 ] else ...[
-                  Row(
-                    children: [
-                      Text(
-                        'Hari Ini',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                  const SizedBox(height: 60),
+                  const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_rounded, size: 64, color: Colors.white24),
+                        SizedBox(height: 16),
+                        Text(
+                          'Belum ada riwayat scan',
+                          style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
-                      ),
-                      const Spacer(),
-                      const _PillInfo(text: '24g total'),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ..._demoFoodLogs.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _FoodLogCard(item: item),
+                        SizedBox(height: 8),
+                        Text(
+                          'Mulai scan makananmu untuk melihat riwayatnya di sini.',
+                          style: TextStyle(color: Colors.white38, fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -146,29 +174,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  static final _demoFoodLogs = <_FoodLogItem>[
-    const _FoodLogItem(
-      name: 'Oatmeal',
-      time: '08:00 WIB',
-      fatGram: 3,
-      accentColor: Color(0xFF29F2C8),
-      icon: Icons.breakfast_dining,
-    ),
-    const _FoodLogItem(
-      name: 'Nasi Padang',
-      time: '13:30 WIB',
-      fatGram: 15,
-      accentColor: Color(0xFFFF5D6C),
-      icon: Icons.ramen_dining,
-    ),
-    const _FoodLogItem(
-      name: 'Ayam Goreng',
-      time: '19:00 WIB',
-      fatGram: 6,
-      accentColor: Color(0xFFFFC34D),
-      icon: Icons.restaurant,
-    ),
-  ];
+
 }
 
 // ─── Scan History Card (Real Data) ───────────────────────────────────────────
@@ -189,10 +195,64 @@ class _ScanHistoryCard extends StatelessWidget {
     }
   }
 
+  void _showDetail(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1B2040),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Detail Scan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (scan.imagePath.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: scan.imagePath.startsWith('http')
+                      ? Image.network(scan.imagePath, height: 150, width: double.infinity, fit: BoxFit.cover)
+                      : Image.file(File(scan.imagePath), height: 150, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c,e,s) => const SizedBox()),
+                ),
+              if (scan.imagePath.isNotEmpty) const SizedBox(height: 16),
+              ...scan.foods.map((food) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('${food.name} (${food.grams.toInt()}g)', style: const TextStyle(color: Colors.white)),
+                        Text('${food.fat.toStringAsFixed(1)}g fat', style: TextStyle(color: _fatColor, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  )),
+              const Divider(color: Colors.white24, height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Lemak', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text('${scan.totalFat.toStringAsFixed(1)}g', style: TextStyle(color: _fatColor, fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tutup', style: TextStyle(color: Colors.white54)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
+    return InkWell(
+      onTap: () => _showDetail(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF1B2040),
         borderRadius: BorderRadius.circular(16),
@@ -210,24 +270,17 @@ class _ScanHistoryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      _fatColor.withOpacity(0.9),
-                      _fatColor.withOpacity(0.3),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.qr_code_scanner_rounded,
-                  color: Colors.white,
-                  size: 22,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  color: _fatColor.withOpacity(0.2),
+                  child: scan.imagePath.isNotEmpty
+                      ? (scan.imagePath.startsWith('http')
+                          ? Image.network(scan.imagePath, fit: BoxFit.cover)
+                          : Image.file(File(scan.imagePath), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.qr_code_scanner_rounded, color: _fatColor, size: 22)))
+                      : Icon(Icons.qr_code_scanner_rounded, color: _fatColor, size: 22),
                 ),
               ),
               const SizedBox(width: 12),
@@ -314,7 +367,7 @@ class _ScanHistoryCard extends StatelessWidget {
           ],
         ],
       ),
-    );
+    ));
   }
 
   String _formatDate(DateTime date) {
@@ -671,116 +724,4 @@ class _FatChartPainter extends CustomPainter {
       oldDelegate.values != values || oldDelegate.limitValue != limitValue;
 }
 
-class _FoodLogItem {
-  const _FoodLogItem({
-    required this.name,
-    required this.time,
-    required this.fatGram,
-    required this.accentColor,
-    required this.icon,
-  });
-  final String name;
-  final String time;
-  final int fatGram;
-  final Color accentColor;
-  final IconData icon;
-}
 
-class _FoodLogCard extends StatelessWidget {
-  const _FoodLogCard({required this.item});
-  final _FoodLogItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8E2D0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x142D7A4F),
-            blurRadius: 18,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                colors: [
-                  item.accentColor.withOpacity(0.95),
-                  item.accentColor.withOpacity(0.35),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Icon(item.icon, color: Colors.white),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF1C3028),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.time,
-                  style: const TextStyle(
-                    color: Color(0xFF4D7060),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${item.fatGram}g',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF1C3028),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'Lemak',
-                style: TextStyle(
-                  color: Color(0xFF4D7060),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 6,
-            height: 34,
-            decoration: BoxDecoration(
-              color: item.accentColor,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -51,6 +51,9 @@ class ScannerProvider extends ChangeNotifier {
   String _errorMessage = '';
   String get errorMessage => _errorMessage;
 
+  bool _isDemoMode = false;
+  bool get isDemoMode => _isDemoMode;
+
   bool get isLoading =>
       _state == ScanState.picking || _state == ScanState.analyzing;
 
@@ -96,9 +99,14 @@ class ScannerProvider extends ChangeNotifier {
     if (!isStreaming) return;
     
     _setState(ScanState.analyzing);
-    _camera.stopStream(); // Hentikan stream
-
+    
     try {
+      // Ambil foto aslinya terlebih dahulu sebelum mematikan stream
+      final File? capturedImage = await _camera.takePicture();
+      _imageFile = capturedImage;
+      
+      _camera.stopStream(); // Hentikan stream
+
       List<DetectedFood> detected = [];
       
       if (_currentDetections.isNotEmpty) {
@@ -109,9 +117,11 @@ class ScannerProvider extends ChangeNotifier {
             confidence: d['confidence'],
           ));
         }
+        _isDemoMode = false;
       } else {
         // Fallback jika tombol ditekan saat AI belum menangkap apa-apa
         detected = _getFallbackFoods();
+        _isDemoMode = true;
       }
 
       // Buat detail nutrisi untuk setiap makanan
@@ -125,7 +135,7 @@ class ScannerProvider extends ChangeNotifier {
       _result = ScanResultModel(
         id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
         tanggal: DateTime.now(),
-        imagePath: '', // Gambar tidak disimpan secara fisik saat ini
+        imagePath: capturedImage?.path ?? '', // Menyimpan gambar yang sebenarnya!
         foods: foods,
         status: fatStatus.shortLabel,
       );
@@ -178,11 +188,12 @@ class ScannerProvider extends ChangeNotifier {
 
   /// Reset ke idle
   void reset() {
-    _camera.stopStream();
+    _camera.dispose(); // Bebaskan kamera sepenuhnya (bukan cuma stopStream)
     _currentDetections.clear();
     _imageFile = null;
     _result = null;
     _errorMessage = '';
+    _isDemoMode = false;
     _setState(ScanState.idle);
   }
 
@@ -212,13 +223,16 @@ class ScannerProvider extends ChangeNotifier {
               confidence: d['confidence'],
             ));
           }
+          _isDemoMode = false;
         } else {
           // Fallback if TFLite fails to detect anything
           detected = _getFallbackFoods();
+          _isDemoMode = true;
         }
       } catch (e) {
         debugPrint('TFLite detection error (fallback): $e');
         detected = _getFallbackFoods();
+        _isDemoMode = true;
       }
 
       // Buat FoodItem untuk setiap makanan yang terdeteksi

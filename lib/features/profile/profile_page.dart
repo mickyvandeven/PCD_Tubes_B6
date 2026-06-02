@@ -26,6 +26,32 @@ class ProfilePage extends StatelessWidget {
     }
   }
 
+  void _showFAQ(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Bantuan & FAQ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1C3028))),
+        content: const SingleChildScrollView(
+          child: Text(
+            '1. Bagaimana cara scan makanan?\n'
+            'Buka tab Scan di tengah bawah, lalu arahkan kamera ke makanan Anda atau pilih gambar dari galeri.\n\n'
+            '2. Apakah data gizi ini 100% akurat?\n'
+            'Hasil kalori dan lemak merupakan estimasi AI berdasarkan visual makanan. Anda dapat mengedit gram secara manual untuk hasil lebih pas.\n\n'
+            '3. Di mana data saya disimpan?\n'
+            'Data disimpan secara lokal di perangkat Anda (agar tetap cepat) dan disinkronisasikan ke Cloud (MongoDB) sebagai backup.'
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tutup', style: TextStyle(color: Color(0xFF2D7A4F), fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hive = HiveService();
@@ -54,9 +80,8 @@ class ProfilePage extends StatelessWidget {
     ];
 
     const List<_SettingItem> settingItems = [
-      _SettingItem(icon: Icons.language_rounded, title: 'Bahasa'),
       _SettingItem(icon: Icons.help_outline_rounded, title: 'Bantuan & FAQ'),
-      _SettingItem(icon: Icons.logout_rounded, title: 'Logout', isLogout: true),
+      _SettingItem(icon: Icons.logout_rounded, title: 'Keluar', isLogout: true),
     ];
 
     return Scaffold(
@@ -82,7 +107,7 @@ class ProfilePage extends StatelessWidget {
                 userName: userName,
                 userEmail: userEmail,
                 accentColor: _accentColor,
-                onEdit: () => context.push('/profile-setup?edit=true'),
+                onEdit: () => context.push('/edit-profile'),
               ),
               const SizedBox(height: 20),
 
@@ -158,7 +183,7 @@ class ProfilePage extends StatelessWidget {
                         cardColor: Colors.transparent,
                         onTap: settingItems[i].isLogout
                             ? () => _logout(context)
-                            : () {},
+                            : () => _showFAQ(context),
                       ),
                       if (i < settingItems.length - 1)
                         const Divider(

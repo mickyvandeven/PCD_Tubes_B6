@@ -102,6 +102,18 @@ class CameraService {
 
   // ─── Fitur Mode Statis / Galeri ──────────────────────────────────────────
 
+  /// Ambil foto langsung dari kamera aktif
+  Future<File?> takePicture() async {
+    if (!isInitialized || _controller == null) return null;
+    try {
+      final XFile file = await _controller!.takePicture();
+      return File(file.path);
+    } catch (e) {
+      debugPrint('CameraService.takePicture error: $e');
+      return null;
+    }
+  }
+
   /// Pilih gambar dari galeri (menggunakan image_picker)
   Future<File?> pickFromGallery() async {
     try {

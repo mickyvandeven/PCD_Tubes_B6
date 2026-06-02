@@ -91,6 +91,17 @@ class MongoService {
     }
   }
 
+  Future<void> deleteScan(String scanId) async {
+    if (!isConnected) return;
+    try {
+      final scansCollection = _db!.collection('scan_results');
+      await scansCollection.remove(where.eq('_id', scanId));
+      debugPrint('ScanResult deleted from Atlas');
+    } catch (e) {
+      debugPrint('Failed to delete ScanResult: $e');
+    }
+  }
+
   Future<UserProfile?> getUserByEmail(String email) async {
     if (!isConnected) throw Exception('Tidak terhubung ke database');
     try {

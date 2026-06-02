@@ -691,7 +691,32 @@ class _ResultView extends StatelessWidget {
                   children: [
                     // ── Preview gambar ──
                     if (imageFile != null) _ImagePreview(file: imageFile!),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    
+                    // ── Demo Warning Banner ──
+                    if (provider.isDemoMode)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.fatHigh.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.fatHigh.withOpacity(0.5)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: AppColors.fatHigh, size: 24),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'AI gagal mendeteksi makanan. Menampilkan data estimasi cadangan (demo).',
+                                style: TextStyle(color: AppColors.fatHigh, fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
                     // ── Fat Status Banner ──
                     _FatStatusBanner(result: result),
                     const SizedBox(height: 16),
