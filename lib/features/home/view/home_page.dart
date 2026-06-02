@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/models/scan_result_model.dart';
+import '../../../data/models/user_profile_model.dart';
 import '../../../data/repositories/history_repository.dart';
+import '../../../data/services/hive_service.dart';
 import '../../../widgets/fat_bottom_nav.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.userName = 'Ridho'});
-
-  final String userName;
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -16,25 +16,32 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final HistoryRepository _repo;
+  late final HiveService _hive;
 
-  int _consumedFat = 0;
+  double _consumedFat = 0.0;
   int _todayScanCount = 0;
-  double _avgFatPerScan = 0;
+  double _avgFatPerScan = 0.0;
   ScanResultModel? _latestScan;
   List<ScanResultModel> _recentScans = [];
 
-  static const int _maxFat = 50;
+  String _userName = 'Pengguna';
+  double _maxFat = 65.0;
 
   @override
   void initState() {
     super.initState();
     _repo = HistoryRepository();
+    _hive = HiveService();
     _loadData();
   }
 
   void _loadData() {
     setState(() {
-      _consumedFat = _repo.getTodayTotalFat().round();
+      final profile = _hive.getProfile();
+      _userName = profile?.nama ?? 'Pengguna';
+      _maxFat = profile?.targetLemakHarian ?? 65.0;
+
+      _consumedFat = _repo.getTodayTotalFat();
       _todayScanCount = _repo.getTodayScanCount();
       _avgFatPerScan = _repo.getAverageFatPerScan();
       _latestScan = _repo.getLatestScan();
@@ -42,17 +49,19 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  int get _percent => ((_consumedFat / _maxFat) * 100).round().clamp(0, 100);
+  int get _percent => _maxFat > 0 ? ((_consumedFat / _maxFat) * 100).round().clamp(0, 100) : 0;
 
   String get _statusLabel {
-    if (_consumedFat < 20) return 'On Track';
-    if (_consumedFat < 40) return 'Getting Close';
+    final ratio = _maxFat > 0 ? (_consumedFat / _maxFat) : 0;
+    if (ratio < 0.5) return 'On Track';
+    if (ratio < 0.9) return 'Getting Close';
     return 'Over Limit!';
   }
 
   Color get _statusColor {
-    if (_consumedFat < 20) return const Color(0xFF2D7A4F);
-    if (_consumedFat < 40) return const Color(0xFFFFC947);
+    final ratio = _maxFat > 0 ? (_consumedFat / _maxFat) : 0;
+    if (ratio < 0.5) return const Color(0xFF2D7A4F);
+    if (ratio < 0.9) return const Color(0xFFFFC947);
     return const Color(0xFFFF5C6B);
   }
 
@@ -81,7 +90,7 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _TopBar(userName: widget.userName),
+                _TopBar(userName: _userName),
                 const SizedBox(height: 20),
                 Text(
                   'Home Dashboard',
@@ -116,23 +125,23 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           _QuickStatCard(
                             icon: Icons.restaurant_menu,
-                            iconColor: Color(0xFF2D7A4F),
+                            iconColor: const Color(0xFF2D7A4F),
                             title: 'Scanned Today',
                             value: '$_todayScanCount items',
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           _QuickStatCard(
                             icon: Icons.water_drop_outlined,
-                            iconColor: Color(0xFFB8D34B),
+                            iconColor: const Color(0xFFB8D34B),
                             title: 'Avg Fat',
                             value: '${_avgFatPerScan.toStringAsFixed(1)}g /meal',
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           _QuickStatCard(
-                            icon: Icons.local_fire_department_outlined,
-                            iconColor: Color(0xFFFFC947),
-                            title: 'Total Scan',
-                            value: '${_repo.getTotalScanCount()} scan',
+                            icon: Icons.track_changes_rounded,
+                            iconColor: const Color(0xFFFFC947),
+                            title: 'Target',
+                            value: '${_maxFat.toStringAsFixed(0)}g',
                           ),
                         ],
                       ),
@@ -411,8 +420,8 @@ class _DailyFatCard extends StatelessWidget {
     required this.onScanTap,
   });
 
-  final int consumedFat;
-  final int maxFat;
+  final double consumedFat;
+  final double maxFat;
   final int percent;
   final String statusLabel;
   final Color statusColor;
@@ -603,8 +612,8 @@ class _FatSummaryText extends StatelessWidget {
     required this.statusColor,
   });
 
-  final int consumedFat;
-  final int maxFat;
+  final double consumedFat;
+  final double maxFat;
   final String statusLabel;
   final Color statusColor;
 
@@ -614,7 +623,7 @@ class _FatSummaryText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${consumedFat}g',
+          '${consumedFat.toStringAsFixed(1)}g',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             color: const Color(0xFF2D7A4F),
             fontWeight: FontWeight.w800,
@@ -622,7 +631,7 @@ class _FatSummaryText extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '/ $maxFat g max',
+          '/ ${maxFat.toStringAsFixed(0)} g target',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xFF4D7060),
             fontWeight: FontWeight.w600,
