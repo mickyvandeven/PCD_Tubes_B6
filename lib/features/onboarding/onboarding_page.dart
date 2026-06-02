@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../../data/services/hive_service.dart';
+import '../../data/services/mongo_service.dart';
+import '../../data/models/user_profile_model.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -51,6 +55,68 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void _goHome() {
     if (!mounted) return;
     context.go('/home');
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      
+      if (account != null) {
+        if (!mounted) return;
+
+        // Munculkan loading
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+        );
+
+        // Cek database
+        UserProfile? existingUser;
+        try {
+          existingUser = await MongoService().getUserByEmail(account.email);
+        } catch (dbError) {
+          if (mounted) {
+            Navigator.of(context).pop(); // Tutup loading
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Koneksi bermasalah: $dbError', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+            );
+          }
+          return;
+        }
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // Tutup loading
+
+        if (existingUser != null) {
+          // PENGGUNA LAMA: Download data ke Hive & langsung ke Home
+          await HiveService().saveProfile(existingUser);
+          
+          // Download riwayat scan (Opsional)
+          final history = await MongoService().getHistoryByUserId(existingUser.id);
+          for (var scan in history) {
+            await HiveService().saveScan(scan);
+          }
+
+          if (mounted) context.go('/home');
+        } else {
+          // PENGGUNA BARU: Lanjut ke Profile Setup
+          context.go('/profile-setup?edit=false', extra: {
+            'nama': account.displayName ?? '',
+            'email': account.email,
+            'googleId': account.id,
+            'photoUrl': account.photoUrl ?? '',
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Login Gagal: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+         );
+      }
+    }
   }
 
   @override
@@ -184,7 +250,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       child: ElevatedButton(
                         onPressed: () {
                           if (_currentPage == _items.length - 1) {
-                            _goHome();
+                            _handleGoogleSignIn();
                           } else {
                             _pageController.nextPage(
                               duration: const Duration(milliseconds: 320),
@@ -206,7 +272,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                         child: Text(
                           _currentPage == _items.length - 1
-                              ? 'Mulai Sekarang'
+                              ? 'Lanjutkan dengan Google'
                               : 'Lanjut',
                         ),
                       ),

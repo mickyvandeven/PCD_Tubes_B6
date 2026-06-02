@@ -103,6 +103,6 @@ class HistoryRepository {
 
 	/// Hapus seluruh riwayat scan
 	Future<void> clearAllHistory() async {
-		await _hive.clearAll();
+		await _hive.clearAllScans();
 	}
 }

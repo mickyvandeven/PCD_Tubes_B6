@@ -724,16 +724,30 @@ class _ResultView extends StatelessWidget {
             // ── Action buttons ──
             _ResultActionBar(
               onSave: () async {
-                await provider.saveScan();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Scan disimpan ke riwayat!'),
-                      backgroundColor: AppColors.primary,
-                    ),
-                  );
-                  provider.reset();
-                  Navigator.of(context).pop();
+                try {
+                  await provider.saveScan();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Scan disimpan ke riwayat!'),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
+                    provider.reset();
+                    Navigator.of(context).pop();
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString().replaceAll('Exception: ', '')),
+                        backgroundColor: AppColors.fatHigh,
+                      ),
+                    );
+                    // Tetap tutup halaman karena secara lokal data sudah tersimpan
+                    provider.reset();
+                    Navigator.of(context).pop();
+                  }
                 }
               },
               onRescan: () => provider.reset(),

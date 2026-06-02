@@ -3,6 +3,7 @@ import 'dart:io';
 import '../models/scan_result_model.dart';
 import '../services/hive_service.dart';
 import '../services/ml_service.dart';
+import '../services/mongo_service.dart';
 import '../services/nutrition_service.dart';
 
 /// Repository untuk mengelola proses scan makanan
@@ -90,6 +91,10 @@ class ScanRepository {
 	/// Simpan hasil scan ke local storage (Hive)
 	Future<void> saveScan(ScanResultModel scan) async {
 		await _hive.saveScan(scan);
+		final profile = _hive.getProfile();
+		if (profile != null) {
+			MongoService().syncScanResult(scan, profile.id);
+		}
 	}
 
 	/// Scan sekaligus langsung simpan ke Hive

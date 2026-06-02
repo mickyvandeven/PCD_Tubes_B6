@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/scan_result_model.dart';
 import '../../data/services/hive_service.dart';
 import '../../data/services/ml_service.dart';
+import '../../data/services/mongo_service.dart';
 import '../../data/services/nutrition_service.dart';
 import 'camera_service.dart';
 import 'inference_service.dart';
@@ -163,8 +164,15 @@ class ScannerProvider extends ChangeNotifier {
     if (_result == null) return;
     try {
       await _hive.saveScan(_result!);
+      
+      // Push ke MongoDB Atlas
+      final profile = _hive.getProfile();
+      if (profile != null) {
+        await MongoService().syncScanResult(_result!, profile.id);
+      }
     } catch (e) {
       debugPrint('ScannerProvider.saveScan error: $e');
+      throw Exception('Tersimpan di lokal, tapi gagal sync ke cloud. Periksa internet.');
     }
   }
 
@@ -192,18 +200,24 @@ class ScannerProvider extends ChangeNotifier {
     _setState(ScanState.analyzing);
 
     try {
-      // Detect foods
-      List<DetectedFood> detected;
+      // Detect foods using TFLite Model
+      List<DetectedFood> detected = [];
       try {
-        detected = await _ml.detectFoodsDetailed(file);
+        final inferenceResults = await _inferenceService.runInferenceOnFile(file.path);
+        
+        if (inferenceResults.isNotEmpty) {
+          for (var d in inferenceResults) {
+            detected.add(DetectedFood(
+              name: d['label'],
+              confidence: d['confidence'],
+            ));
+          }
+        } else {
+          // Fallback if TFLite fails to detect anything
+          detected = _getFallbackFoods();
+        }
       } catch (e) {
-        debugPrint('ML detection error (fallback): $e');
-        // Fallback jika ML Kit gagal (mis. emulator tanpa model)
-        detected = _getFallbackFoods();
-      }
-
-      // Jika tidak ada yang terdeteksi, gunakan fallback
-      if (detected.isEmpty) {
+        debugPrint('TFLite detection error (fallback): $e');
         detected = _getFallbackFoods();
       }
 

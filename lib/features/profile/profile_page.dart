@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/hive_service.dart';
@@ -11,7 +12,19 @@ class ProfilePage extends StatelessWidget {
   static const Color _cardColor = Color(0xFFFFFFFF);
   static const Color _accentColor = Color(0xFF2D7A4F);
 
-  void _logout(BuildContext context) => context.go('/splash');
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await GoogleSignIn().signOut();
+      await HiveService().deleteProfile();
+      if (context.mounted) context.go('/onboarding');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logout gagal: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -7,15 +7,28 @@ import '../../data/repositories/history_repository.dart';
 import '../../data/services/hive_service.dart';
 import '../../widgets/fat_bottom_nav.dart';
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  String _selectedFilter = 'Semua';
 
   @override
   Widget build(BuildContext context) {
     final historyRepository = HistoryRepository(
       hiveService: context.read<HiveService>(),
     );
-    final scans = historyRepository.getAllHistory();
+    var scans = historyRepository.getAllHistory();
+    final now = DateTime.now();
+    if (_selectedFilter == 'Hari ini') {
+      scans = scans.where((s) => s.tanggal.day == now.day && s.tanggal.month == now.month && s.tanggal.year == now.year).toList();
+    } else if (_selectedFilter == 'Bulan ini') {
+      scans = scans.where((s) => s.tanggal.month == now.month && s.tanggal.year == now.year).toList();
+    }
     final weeklyValues = historyRepository.getWeeklyFatAverage();
     final weeklyAverage = weeklyValues.isEmpty
         ? 0
@@ -56,9 +69,22 @@ class HistoryPage extends StatelessWidget {
                           ),
                     ),
                     const Spacer(),
-                    _FilterChip(
-                      label: 'Hari ini',
-                      icon: Icons.keyboard_arrow_down,
+                    PopupMenuButton<String>(
+                      initialValue: _selectedFilter,
+                      onSelected: (value) {
+                        setState(() {
+                          _selectedFilter = value;
+                        });
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'Semua', child: Text('Semua')),
+                        const PopupMenuItem(value: 'Hari ini', child: Text('Hari ini')),
+                        const PopupMenuItem(value: 'Bulan ini', child: Text('Bulan ini')),
+                      ],
+                      child: _FilterChip(
+                        label: _selectedFilter,
+                        icon: Icons.keyboard_arrow_down,
+                      ),
                     ),
                   ],
                 ),
@@ -549,7 +575,13 @@ class _FatChartPainter extends CustomPainter {
     const bottomPadding = 42.0;
     final chartWidth = size.width - leftPadding - rightPadding;
     final chartHeight = size.height - topPadding - bottomPadding;
-    const maxValue = 50.0;
+    
+    double maxValue = 50.0;
+    for (final v in values) {
+      if (v > maxValue) {
+        maxValue = v * 1.2;
+      }
+    }
 
     final gridPaint = Paint()
       ..color = const Color(0xFFD5EAD9).withOpacity(0.45)

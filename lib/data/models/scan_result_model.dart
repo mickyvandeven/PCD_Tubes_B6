@@ -24,20 +24,23 @@ class FoodItem extends HiveObject {
   @HiveField(5)
   final double confidence;
 
+  @HiveField(6, defaultValue: 0.0)
+  final double calories;
+
+  @HiveField(7, defaultValue: 0.0)
+  final double fat;
+
   FoodItem({
     required this.name,
     required this.grams,
-    required this.defaultGrams,
-    required this.defaultFat,
-    required this.defaultCalories,
+    this.defaultGrams = 100.0,
+    this.defaultFat = 0.0,
+    this.defaultCalories = 0.0,
     this.confidence = 1.0,
-  });
-
-  /// Lemak dihitung proporsional terhadap gram yang diinput
-  double get fat => (grams / defaultGrams) * defaultFat;
-
-  /// Kalori dihitung proporsional terhadap gram yang diinput
-  double get calories => (grams / defaultGrams) * defaultCalories;
+    double? calories,
+    double? fat,
+  }) : calories = calories ?? (defaultGrams > 0 ? (grams / defaultGrams) * defaultCalories : 0.0),
+       fat = fat ?? (defaultGrams > 0 ? (grams / defaultGrams) * defaultFat : 0.0);
 
   FoodItem copyWith({
     String? name,
@@ -46,6 +49,8 @@ class FoodItem extends HiveObject {
     double? defaultFat,
     double? defaultCalories,
     double? confidence,
+    double? calories,
+    double? fat,
   }) {
     return FoodItem(
       name: name ?? this.name,
@@ -54,6 +59,8 @@ class FoodItem extends HiveObject {
       defaultFat: defaultFat ?? this.defaultFat,
       defaultCalories: defaultCalories ?? this.defaultCalories,
       confidence: confidence ?? this.confidence,
+      calories: calories ?? this.calories,
+      fat: fat ?? this.fat,
     );
   }
 
@@ -64,15 +71,19 @@ class FoodItem extends HiveObject {
     'defaultFat': defaultFat,
     'defaultCalories': defaultCalories,
     'confidence': confidence,
+    'calories': calories,
+    'fat': fat,
   };
 
   factory FoodItem.fromMap(Map<String, dynamic> map) => FoodItem(
     name: map['name'] as String,
     grams: (map['grams'] as num).toDouble(),
-    defaultGrams: (map['defaultGrams'] as num).toDouble(),
-    defaultFat: (map['defaultFat'] as num).toDouble(),
-    defaultCalories: (map['defaultCalories'] as num).toDouble(),
-    confidence: (map['confidence'] as num? ?? 1.0).toDouble(),
+    defaultGrams: (map['defaultGrams'] as num?)?.toDouble() ?? 100.0,
+    defaultFat: (map['defaultFat'] as num?)?.toDouble() ?? 0.0,
+    defaultCalories: (map['defaultCalories'] as num?)?.toDouble() ?? 0.0,
+    confidence: (map['confidence'] as num?)?.toDouble() ?? 1.0,
+    calories: (map['calories'] as num?)?.toDouble(),
+    fat: (map['fat'] as num?)?.toDouble(),
   );
 }
 

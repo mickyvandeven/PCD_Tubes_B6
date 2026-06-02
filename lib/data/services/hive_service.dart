@@ -5,6 +5,9 @@ import '../models/user_profile_model.dart';
 
 /// Service untuk menyimpan dan membaca data lokal menggunakan Hive
 class HiveService {
+  static final HiveService _instance = HiveService._internal();
+  factory HiveService() => _instance;
+  HiveService._internal();
   static const _boxScanHistory = 'scan_history';
   static const _boxUserProfile = 'user_profile';
   static const _profileKey = 'current_user';

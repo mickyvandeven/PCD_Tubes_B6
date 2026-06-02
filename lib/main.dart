@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/hive_service.dart';
+import 'data/services/mongo_service.dart';
 import 'features/history/history_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/onboarding/onboarding_page.dart';
@@ -12,14 +13,25 @@ import 'features/onboarding/profile_setup_page.dart';
 import 'features/profile/profile_page.dart';
 import 'features/scanner/scanner_page.dart';
 
+import 'dart:ui';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Tangkap semua error asinkron yang tidak tertangani (misal koneksi putus dari mongo_dart) agar aplikasi tidak crash
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[Global Error Handler] Tertangkap error: $error');
+    return true; // Cegah aplikasi crash
+  };
 
   // Muat konfigurasi dari .env
   await dotenv.load(fileName: ".env");
 
   // Inisialisasi Hive untuk penyimpanan riwayat scan & profil user
   await HiveService.init();
+
+  // Inisialisasi MongoDB untuk sinkronisasi cloud (dijelankan di background tanpa await agar tidak white screen)
+  MongoService().init();
 
   runApp(const FatScanApp());
 }
@@ -28,9 +40,9 @@ class FatScanApp extends StatelessWidget {
   const FatScanApp({super.key});
 
   static final GoRouter _router = GoRouter(
-    initialLocation: '/onboarding',
+    initialLocation: '/',
     routes: <RouteBase>[
-      GoRoute(path: '/', redirect: (_, __) => '/onboarding'),
+      GoRoute(path: '/', redirect: (_, __) => HiveService().hasProfile() ? '/home' : '/onboarding'),
       GoRoute(path: '/splash', redirect: (_, __) => '/onboarding'),
       GoRoute(
         path: '/onboarding',
@@ -40,7 +52,8 @@ class FatScanApp extends StatelessWidget {
         path: '/profile-setup',
         pageBuilder: (_, state) {
           final isEdit = state.uri.queryParameters['edit'] == 'true';
-          return NoTransitionPage(child: ProfileSetupPage(isEdit: isEdit));
+          final googleData = state.extra as Map<String, dynamic>?;
+          return NoTransitionPage(child: ProfileSetupPage(isEdit: isEdit, googleData: googleData));
         },
       ),
       GoRoute(

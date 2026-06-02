@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -99,6 +100,37 @@ class InferenceService {
       onResult?.call(InferenceResult([]));
     } finally {
       _isProcessing = false;
+    }
+  }
+
+  Future<List<dynamic>> runInferenceOnFile(String filePath) async {
+    if (!_isReady || _interpreter == null) return [];
+    try {
+      final fileData = await File(filePath).readAsBytes();
+      img.Image? colorImage = img.decodeImage(fileData);
+      if (colorImage == null) return [];
+
+      final inputTensor = _interpreter!.getInputTensors().first;
+      final isQuantized = inputTensor.type == TensorType.uint8 || inputTensor.type == TensorType.int8;
+      var inputData = FramePreprocessor.imageToTensor(colorImage, 224, isQuantized);
+      
+      final outputTensor = _interpreter!.getOutputTensors().first;
+      final outputShape = outputTensor.shape;
+      
+      var outputData = List.generate(
+        outputShape[0],
+        (_) => List.generate(
+          outputShape[1],
+          (_) => List.filled(outputShape[2], 0.0),
+        ),
+      );
+      
+      _interpreter!.run(inputData, outputData);
+      final detections = ResultParser.parseYolo(outputData, 0.40);
+      return detections;
+    } catch (e) {
+      debugPrint('Inference on file error: $e');
+      return [];
     }
   }
 

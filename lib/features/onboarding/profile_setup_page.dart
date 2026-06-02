@@ -5,11 +5,14 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/hive_service.dart';
+import '../../data/services/mongo_service.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   /// isEdit = true saat dipanggil dari Profile page untuk mengedit
   final bool isEdit;
-  const ProfileSetupPage({super.key, this.isEdit = false});
+  final Map<String, dynamic>? googleData;
+  
+  const ProfileSetupPage({super.key, this.isEdit = false, this.googleData});
 
   @override
   State<ProfileSetupPage> createState() => _ProfileSetupPageState();
@@ -62,6 +65,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
         _tinggiBadan = profile.tinggiBadan;
         _levelAktivitas = profile.levelAktivitas;
       }
+    } else if (widget.googleData != null) {
+      _namaCtrl.text = widget.googleData!['nama'] ?? '';
     }
   }
 
@@ -96,8 +101,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   Future<void> _saveProfile() async {
     final existing = HiveService().getProfile();
     final profile = UserProfile(
-      id: existing?.id ?? const Uuid().v4(),
+      id: existing?.id ?? widget.googleData?['googleId'] ?? const Uuid().v4(),
       nama: _namaCtrl.text.trim().isEmpty ? 'Pengguna' : _namaCtrl.text.trim(),
+      email: widget.googleData?['email'] ?? existing?.email ?? '',
       jenisKelamin: _jenisKelamin,
       usia: _usia,
       beratBadan: _beratBadan,
@@ -107,6 +113,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
       updatedAt: DateTime.now(),
     );
     await HiveService().saveProfile(profile);
+    MongoService().syncUserProfile(profile); // Trigger MongoDB sync in background
     if (mounted) context.go('/home');
   }
 
