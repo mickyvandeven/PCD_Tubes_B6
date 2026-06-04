@@ -135,9 +135,10 @@ class ScannerProvider extends ChangeNotifier {
       _result = ScanResultModel(
         id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
         tanggal: DateTime.now(),
-        imagePath: capturedImage?.path ?? '', // Menyimpan gambar yang sebenarnya!
+        imagePath: capturedImage?.path ?? '',
         foods: foods,
         status: fatStatus.shortLabel,
+        userId: _hive.getProfile()?.id ?? '',
       );
 
       _setState(ScanState.done);
@@ -249,6 +250,7 @@ class ScannerProvider extends ChangeNotifier {
         imagePath: file.path,
         foods: foods,
         status: fatStatus.shortLabel,
+        userId: _hive.getProfile()?.id ?? '',
       );
 
       _setState(ScanState.done);

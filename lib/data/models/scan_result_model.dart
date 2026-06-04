@@ -138,12 +138,17 @@ class ScanResultModel extends HiveObject {
   @HiveField(4)
   final String status;
 
+  /// ID user pemilik data ini. Scan hanya ditampilkan ke user yang sesuai.
+  @HiveField(5, defaultValue: '')
+  final String userId;
+
   ScanResultModel({
     required this.id,
     required this.tanggal,
     required this.imagePath,
     required this.foods,
     required this.status,
+    this.userId = '',
   });
 
   double get totalFat =>
@@ -167,6 +172,7 @@ class ScanResultModel extends HiveObject {
     String? imagePath,
     List<FoodItem>? foods,
     String? status,
+    String? userId,
   }) {
     return ScanResultModel(
       id: id ?? this.id,
@@ -174,6 +180,7 @@ class ScanResultModel extends HiveObject {
       imagePath: imagePath ?? this.imagePath,
       foods: foods ?? this.foods,
       status: status ?? this.status,
+      userId: userId ?? this.userId,
     );
   }
 

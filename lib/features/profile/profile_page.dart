@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/hive_service.dart';
+import '../auth/auth_service.dart';
 import '../../widgets/fat_bottom_nav.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -14,9 +14,9 @@ class ProfilePage extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     try {
-      await GoogleSignIn().signOut();
-      await HiveService().deleteProfile();
-      if (context.mounted) context.go('/onboarding');
+      // AuthService membersihkan Google + sesi lokal + profil sekaligus.
+      await AuthService().signOut();
+      if (context.mounted) context.go('/login');
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

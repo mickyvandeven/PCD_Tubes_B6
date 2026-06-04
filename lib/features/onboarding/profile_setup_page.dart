@@ -515,86 +515,25 @@ class _StepUsia extends StatelessWidget {
             'Usia menentukan kebutuhan metabolisme basal.',
             style: TextStyle(color: Color(0xFF4D7060), fontSize: 15, height: 1.5),
           ),
-          const SizedBox(height: 60),
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _CircleButton(
-                  icon: Icons.remove,
-                  onTap: () {
-                    if (value > 10) onChanged(value - 1);
-                  },
-                ),
-                const SizedBox(width: 28),
-                Column(
-                  children: [
-                    Text(
-                      '$value',
-                      style: const TextStyle(
-                        color: _primary,
-                        fontSize: 72,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                      ),
-                    ),
-                    const Text(
-                      'tahun',
-                      style: TextStyle(
-                        color: Color(0xFF4D7060),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 28),
-                _CircleButton(
-                  icon: Icons.add,
-                  onTap: () {
-                    if (value < 100) onChanged(value + 1);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          Slider(
-            value: value.toDouble(),
-            min: 10,
-            max: 100,
-            divisions: 90,
-            activeColor: _primary,
-            inactiveColor: const Color(0xFFD0EDE0),
-            onChanged: (v) => onChanged(v.round()),
+          const SizedBox(height: 36),
+          _InputField(
+            initialValue: value.toString(),
+            label: 'Usia',
+            suffix: 'tahun',
+            icon: Icons.cake_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
+            onChanged: (v) {
+              final parsed = int.tryParse(v);
+              if (parsed != null && parsed >= 1 && parsed <= 120) {
+                onChanged(parsed);
+              }
+            },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CircleButton extends StatelessWidget {
-  const _CircleButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  static const _primary = Color(0xFF2D7A4F);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: const Color(0xFFEBF4E8),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFC8E2D0)),
-        ),
-        child: Icon(icon, color: _primary, size: 24),
       ),
     );
   }
@@ -614,8 +553,6 @@ class _StepFisik extends StatelessWidget {
   final double tinggiBadan;
   final ValueChanged<double> onBeratChanged;
   final ValueChanged<double> onTinggiChanged;
-
-  static const _primary = Color(0xFF2D7A4F);
 
   @override
   Widget build(BuildContext context) {
@@ -640,24 +577,42 @@ class _StepFisik extends StatelessWidget {
           const SizedBox(height: 32),
 
           // Berat Badan
-          _SliderSection(
+          _InputField(
+            initialValue: beratBadan.toStringAsFixed(0),
             label: 'Berat Badan',
-            unit: 'kg',
-            value: beratBadan,
-            min: 30,
-            max: 200,
-            onChanged: onBeratChanged,
+            suffix: 'kg',
+            icon: Icons.monitor_weight_outlined,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              LengthLimitingTextInputFormatter(5),
+            ],
+            onChanged: (v) {
+              final parsed = double.tryParse(v);
+              if (parsed != null && parsed >= 10 && parsed <= 300) {
+                onBeratChanged(parsed);
+              }
+            },
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // Tinggi Badan
-          _SliderSection(
+          _InputField(
+            initialValue: tinggiBadan.toStringAsFixed(0),
             label: 'Tinggi Badan',
-            unit: 'cm',
-            value: tinggiBadan,
-            min: 100,
-            max: 250,
-            onChanged: onTinggiChanged,
+            suffix: 'cm',
+            icon: Icons.height_rounded,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              LengthLimitingTextInputFormatter(5),
+            ],
+            onChanged: (v) {
+              final parsed = double.tryParse(v);
+              if (parsed != null && parsed >= 50 && parsed <= 300) {
+                onTinggiChanged(parsed);
+              }
+            },
           ),
         ],
       ),
@@ -665,105 +620,68 @@ class _StepFisik extends StatelessWidget {
   }
 }
 
-class _SliderSection extends StatelessWidget {
-  const _SliderSection({
+/// Input field sederhana untuk angka (usia, BB, TB).
+class _InputField extends StatelessWidget {
+  const _InputField({
+    required this.initialValue,
     required this.label,
-    required this.unit,
-    required this.value,
-    required this.min,
-    required this.max,
+    required this.suffix,
+    required this.icon,
+    required this.keyboardType,
     required this.onChanged,
+    this.inputFormatters,
   });
 
+  final String initialValue;
   final String label;
-  final String unit;
-  final double value;
-  final double min;
-  final double max;
-  final ValueChanged<double> onChanged;
+  final String suffix;
+  final IconData icon;
+  final TextInputType keyboardType;
+  final ValueChanged<String> onChanged;
+  final List<TextInputFormatter>? inputFormatters;
 
   static const _primary = Color(0xFF2D7A4F);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFC8E2D0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x102D7A4F),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
+    return TextFormField(
+      initialValue: initialValue,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
+      style: const TextStyle(
+        color: Color(0xFF1C3028),
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF4D7060),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: value.toStringAsFixed(1),
-                      style: const TextStyle(
-                        color: _primary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' $unit',
-                      style: const TextStyle(
-                        color: Color(0xFF4D7060),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: ((max - min) * 2).round(),
-            activeColor: _primary,
-            inactiveColor: const Color(0xFFD0EDE0),
-            onChanged: onChanged,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${min.toInt()} $unit',
-                style: const TextStyle(
-                    color: Color(0xFF9AB5A5), fontSize: 12),
-              ),
-              Text(
-                '${max.toInt()} $unit',
-                style: const TextStyle(
-                    color: Color(0xFF9AB5A5), fontSize: 12),
-              ),
-            ],
-          ),
-        ],
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: Color(0xFF4D7060),
+          fontWeight: FontWeight.w600,
+        ),
+        suffixText: suffix,
+        suffixStyle: const TextStyle(
+          color: Color(0xFF4D7060),
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        prefixIcon: Icon(icon, color: _primary),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFC8E2D0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFC8E2D0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: _primary, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       ),
     );
   }

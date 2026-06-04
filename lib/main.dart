@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/hive_service.dart';
 import 'data/services/mongo_service.dart';
+import 'features/auth/login_page.dart';
+import 'features/auth/register_page.dart';
 import 'features/history/history_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/onboarding/onboarding_page.dart';
@@ -43,11 +45,31 @@ class FatScanApp extends StatelessWidget {
   static final GoRouter _router = GoRouter(
     initialLocation: '/',
     routes: <RouteBase>[
-      GoRoute(path: '/', redirect: (_, __) => HiveService().hasProfile() ? '/home' : '/onboarding'),
+      GoRoute(
+        path: '/',
+        redirect: (_, __) {
+          final hive = HiveService();
+          // Belum ada sesi (login penuh / tamu) → mulai dari onboarding.
+          if (!hive.hasSession) return '/onboarding';
+          // Tamu boleh langsung ke home (akses terbatas, tanpa setup profil).
+          if (hive.isGuest) return '/home';
+          // Login penuh tapi belum isi profil → setup profil.
+          if (!hive.hasProfile()) return '/profile-setup';
+          return '/home';
+        },
+      ),
       GoRoute(path: '/splash', redirect: (_, __) => '/onboarding'),
       GoRoute(
         path: '/onboarding',
         pageBuilder: (_, __) => const NoTransitionPage(child: OnboardingPage()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, __) => const NoTransitionPage(child: LoginPage()),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (_, __) => const RegisterPage(),
       ),
       GoRoute(
         path: '/profile-setup',
@@ -61,10 +83,13 @@ class FatScanApp extends StatelessWidget {
         path: '/home',
         pageBuilder: (_, __) => const NoTransitionPage(child: HomePage()),
         redirect: (context, state) {
-          // Redirect ke profile-setup jika belum ada profil
-          if (!HiveService().hasProfile()) {
-            return '/profile-setup';
-          }
+          final hive = HiveService();
+          // Tanpa sesi sama sekali → kembali ke login.
+          if (!hive.hasSession) return '/login';
+          // Tamu boleh masuk home walau belum ada profil (akses terbatas).
+          if (hive.isGuest) return null;
+          // Login penuh tapi belum ada profil → setup profil dulu.
+          if (!hive.hasProfile()) return '/profile-setup';
           return null;
         },
       ),

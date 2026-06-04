@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:flutter/foundation.dart';
@@ -11,6 +13,13 @@ class MongoService {
 
   Db? _db;
   bool get isConnected => _db?.state == State.open;
+
+  /// Hash password menggunakan SHA-256. Sederhana dan cukup untuk MVP.
+  /// Pada production, gunakan bcrypt atau Argon2 di sisi backend.
+  static String hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    return sha256.convert(bytes).toString();
+  }
 
   Future<void> init() async {
     try {
@@ -28,31 +37,114 @@ class MongoService {
     }
   }
 
-  Future<void> syncUserProfile(UserProfile profile) async {
+  Future<void> syncUserProfile(UserProfile profile, {String? password}) async {
     if (!isConnected) return;
     try {
       final usersCollection = _db!.collection('users');
       
+      final doc = <String, dynamic>{
+        '_id': profile.id,
+        'nama': profile.nama,
+        'email': profile.email.isNotEmpty ? profile.email : 'default@email.com',
+        'jenisKelamin': profile.jenisKelamin,
+        'usia': profile.usia,
+        'beratBadan': profile.beratBadan,
+        'tinggiBadan': profile.tinggiBadan,
+        'levelAktivitas': profile.levelAktivitas.index,
+        'createdAt': profile.createdAt,
+        'updatedAt': profile.updatedAt,
+      };
+
+      // Jika password diberikan (registrasi awal), simpan hash-nya.
+      if (password != null && password.isNotEmpty) {
+        doc['passwordHash'] = hashPassword(password);
+      }
+
       // Update if exists, insert if not (upsert)
       await usersCollection.update(
-        where.eq('_id', profile.id), // assuming you map Dart id to _id
-        {
-          '_id': profile.id,
-          'nama': profile.nama,
-          'email': profile.email.isNotEmpty ? profile.email : 'default@email.com',
-          'jenisKelamin': profile.jenisKelamin,
-          'usia': profile.usia,
-          'beratBadan': profile.beratBadan,
-          'tinggiBadan': profile.tinggiBadan,
-          'levelAktivitas': profile.levelAktivitas.index,
-          'createdAt': profile.createdAt,
-          'updatedAt': profile.updatedAt,
-        },
+        where.eq('_id', profile.id),
+        doc,
         upsert: true,
       );
       debugPrint('UserProfile synced to Atlas');
     } catch (e) {
       debugPrint('Failed to sync UserProfile: $e');
+    }
+  }
+
+  /// Registrasi user baru dengan email & password (hashed).
+  /// Mengembalikan true jika berhasil, false jika email sudah terdaftar.
+  Future<bool> registerUser({
+    required String id,
+    required String email,
+    required String password,
+    required String nama,
+  }) async {
+    if (!isConnected) throw Exception('Tidak terhubung ke database');
+    try {
+      final usersCollection = _db!.collection('users');
+      
+      // Cek duplikasi email
+      final existing = await usersCollection.findOne(where.eq('email', email));
+      if (existing != null) return false; // Email sudah terdaftar
+
+      await usersCollection.insertOne({
+        '_id': id,
+        'nama': nama,
+        'email': email,
+        'passwordHash': hashPassword(password),
+        'jenisKelamin': 'pria',
+        'usia': 22,
+        'beratBadan': 65.0,
+        'tinggiBadan': 165.0,
+        'levelAktivitas': 2,
+        'createdAt': DateTime.now(),
+        'updatedAt': DateTime.now(),
+      });
+      debugPrint('User registered in Atlas');
+      return true;
+    } catch (e) {
+      debugPrint('registerUser error: $e');
+      throw Exception('Gagal mendaftarkan akun: $e');
+    }
+  }
+
+  /// Verifikasi email + password. Mengembalikan UserProfile jika valid,
+  /// null jika password salah atau user tidak ditemukan.
+  Future<UserProfile?> verifyLogin(String email, String password) async {
+    if (!isConnected) throw Exception('Tidak terhubung ke database');
+    try {
+      final usersCollection = _db!.collection('users');
+      final result = await usersCollection.findOne(where.eq('email', email));
+      
+      if (result == null) return null; // User tidak ditemukan
+
+      final storedHash = result['passwordHash'] as String?;
+      if (storedHash == null || storedHash.isEmpty) {
+        // User lama tanpa password (misal login via Google sebelumnya).
+        return null;
+      }
+
+      // Bandingkan hash
+      if (storedHash != hashPassword(password)) {
+        return null; // Password salah
+      }
+
+      return UserProfile(
+        id: result['_id'] as String,
+        nama: result['nama'] as String,
+        email: result['email'] as String,
+        jenisKelamin: result['jenisKelamin'] as String,
+        usia: result['usia'] as int,
+        beratBadan: (result['beratBadan'] as num).toDouble(),
+        tinggiBadan: (result['tinggiBadan'] as num).toDouble(),
+        levelAktivitas: ActivityLevel.values[result['levelAktivitas'] as int],
+        createdAt: DateTime.parse(result['createdAt'].toString()),
+        updatedAt: DateTime.parse(result['updatedAt'].toString()),
+      );
+    } catch (e) {
+      debugPrint('verifyLogin error: $e');
+      throw Exception('Koneksi ke database gagal: $e');
     }
   }
 
