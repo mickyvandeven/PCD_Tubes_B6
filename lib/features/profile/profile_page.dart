@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/user_profile_model.dart';
@@ -13,8 +14,71 @@ class ProfilePage extends StatelessWidget {
   static const Color _accentColor = Color(0xFF2D7A4F);
 
   Future<void> _logout(BuildContext context) async {
+    // Tampilkan dialog konfirmasi sebelum logout
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        icon: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFE53935).withValues(alpha: 0.12),
+          ),
+          child: const Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 28),
+        ),
+        title: const Text(
+          'Keluar dari Akun?',
+          style: TextStyle(
+            color: Color(0xFF1C3028),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
+        content: const Text(
+          'Kamu akan keluar dari akunmu. Data scan tetap tersimpan di cloud dan bisa diakses kembali saat login.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF4D7060), fontSize: 14, height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4D7060),
+                    side: const BorderSide(color: Color(0xFFC8E2D0)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE53935),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
-      // AuthService membersihkan Google + sesi lokal + profil sekaligus.
       await AuthService().signOut();
       if (context.mounted) context.go('/login');
     } catch (e) {
@@ -84,18 +148,27 @@ class ProfilePage extends StatelessWidget {
       _SettingItem(icon: Icons.logout_rounded, title: 'Keluar', isLogout: true),
     ];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F8F2),
-      bottomNavigationBar: FatBottomNav(
-        currentIndex: 2,
-        onScanTap: () => context.push('/scanner'),
-        onTap: (index) {
-          if (index == 0)
-            context.go('/home');
-          else if (index == 1)
-            context.go('/history');
-        },
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldExit = await _showExitDialog(context);
+        if (shouldExit && context.mounted) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F8F2),
+        bottomNavigationBar: FatBottomNav(
+          currentIndex: 2,
+          onScanTap: () => context.push('/scanner'),
+          onTap: (index) {
+            if (index == 0)
+              context.go('/home');
+            else if (index == 1)
+              context.go('/history');
+          },
+        ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -199,7 +272,72 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
+  }
+
+  Future<bool> _showExitDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        icon: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF2D7A4F).withValues(alpha: 0.12),
+          ),
+          child: const Icon(Icons.exit_to_app_rounded, color: Color(0xFF2D7A4F), size: 28),
+        ),
+        title: const Text(
+          'Keluar Aplikasi?',
+          style: TextStyle(
+            color: Color(0xFF1C3028),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
+        content: const Text(
+          'Yakin ingin keluar dari FatScan?',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF4D7060), fontSize: 14, height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4D7060),
+                    side: const BorderSide(color: Color(0xFFC8E2D0)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2D7A4F),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Keluar', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
 
