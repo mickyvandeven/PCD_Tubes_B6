@@ -116,7 +116,10 @@ class _ScannerViewState extends State<_ScannerView> with WidgetsBindingObserver 
       case ScanState.streaming:
         return const _CameraStreamView();
       case ScanState.analyzing:
-        return _LoadingView(message: 'AI sedang menganalisis makanan...');
+        return _AnalyzingView(
+          imageFile: provider.imageFile,
+          detections: provider.currentDetections,
+        );
       case ScanState.done:
         if (provider.result != null) {
           return _ResultView(
@@ -530,6 +533,150 @@ class _CameraStreamView extends StatelessWidget {
               ],
             ),
           )
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Analyzing View (gambar + bounding box + loading) ─────────────────────────
+
+/// Tampilan saat AI sedang menganalisis. Menampilkan gambar yang baru diambil
+/// dengan bounding box yang menandai posisi makanan yang terdeteksi, plus
+/// overlay loading indicator agar user tahu proses masih berjalan.
+class _AnalyzingView extends StatelessWidget {
+  const _AnalyzingView({
+    required this.imageFile,
+    required this.detections,
+  });
+
+  final File? imageFile;
+  final List<dynamic> detections;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Gambar yang baru di-capture ──
+          if (imageFile != null)
+            Image.file(
+              imageFile!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            )
+          else
+            Container(color: AppColors.background),
+
+          // ── Bounding Box mengikuti posisi makanan ──
+          if (detections.isNotEmpty)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: BoundingBoxPainter(detections: detections),
+              ),
+            ),
+
+          // ── Scanning animation overlay ──
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.5),
+                  ],
+                  stops: const [0.0, 0.3, 0.7, 1.0],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Status text + spinner di bawah ──
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 60,
+            left: 0,
+            right: 0,
+            child: Column(
+              children: [
+                // Spinner
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Label
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Menganalisis makanan...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Bounding box labels overlay (jumlah makanan terdeteksi) ──
+          if (detections.isNotEmpty)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.fastfood_rounded, color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${detections.length} makanan terdeteksi',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -67,16 +67,27 @@ class ScannerProvider extends ChangeNotifier {
 
   // ─── Public Methods ──────────────────────────────────────────────────────
 
-  /// Buka kamera dan mulai stream
+  /// Buka kamera dan mulai inferensi periodik
   Future<void> scanFromCamera() async {
     try {
       _setState(ScanState.picking);
       await _camera.initialize();
       _setState(ScanState.streaming);
-      // Memulai stream kamera, frame diproses di Background Isolate
-      await _camera.startStream((imageFrame) {
-        _inferenceService.runInference(imageFrame);
-      });
+
+      // Menggunakan periodic capture: kamera mengambil foto setiap 1.5 detik
+      // dan mengirimnya ke isolate untuk inferensi. Preview tetap 30 FPS
+      // tanpa gangguan karena TIDAK menggunakan startImageStream.
+      await _camera.startPeriodicCapture(
+        interval: const Duration(milliseconds: 1500),
+        onCapture: (filePath) async {
+          final detections =
+              await _inferenceService.runInferenceOnFile(filePath);
+          if (isStreaming && detections.isNotEmpty) {
+            _currentDetections = detections;
+            notifyListeners();
+          }
+        },
+      );
     } catch (e) {
       _errorMessage = 'Gagal membuka kamera: $e';
       _setState(ScanState.error);
@@ -105,7 +116,7 @@ class ScannerProvider extends ChangeNotifier {
       final File? capturedImage = await _camera.takePicture();
       _imageFile = capturedImage;
       
-      _camera.stopStream(); // Hentikan stream
+      _camera.stopStream(); // Hentikan periodic capture
 
       List<DetectedFood> detected = [];
       

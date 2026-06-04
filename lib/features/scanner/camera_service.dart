@@ -1,21 +1,36 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/config/env_config.dart';
 
-/// Layer 1: Camera Stream
-/// Mengelola seluruh alur frame dari kamera perangkat (real-time) dan galeri.
+/// Layer 1: Camera Service
+///
+/// Mengelola kamera perangkat dengan dua mode:
+/// 1. **Preview Only** (default) — kamera menyala, preview berjalan mulus
+///    tanpa image stream. Ini sama lancarnya dengan buka kamera biasa / QRIS.
+/// 2. **Periodic Capture** — untuk inferensi ML, secara periodik mengambil
+///    gambar via `takePicture()` di background, tanpa menggunakan
+///    `startImageStream` yang membebani UI thread.
+///
+/// Kenapa TIDAK pakai startImageStream?
+/// → Plugin camera mengirim 30 callback/detik ke UI thread, masing-masing
+///   membawa data frame berukuran besar. Ini menyebabkan jank/patah-patah
+///   di preview meskipun pemrosesan sudah di isolate. Pendekatan periodic
+///   capture menghindari masalah ini sepenuhnya.
 class CameraService {
   CameraController? _controller;
   final ImagePicker _picker = ImagePicker();
   bool _isStreaming = false;
+  Timer? _captureTimer;
 
   CameraController? get controller => _controller;
-  bool get isInitialized => _controller != null && _controller!.value.isInitialized;
+  bool get isInitialized =>
+      _controller != null && _controller!.value.isInitialized;
   bool get isStreaming => _isStreaming;
 
-  /// Inisialisasi kamera belakang dengan resolusi dari EnvConfig
+  /// Inisialisasi kamera belakang. Preview langsung lancar setelah ini.
   Future<void> initialize() async {
     if (_controller != null) return;
 
@@ -25,32 +40,24 @@ class CameraService {
         throw Exception("Tidak ada kamera yang tersedia pada perangkat ini.");
       }
 
-      // Pilih kamera belakang jika ada, atau kamera pertama
       final camera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
 
-      // ANTI-LAG: untuk preview + stream real-time, JANGAN gunakan resolusi
-      // maksimum. Resolusi tinggi membuat buffer frame besar sehingga konversi
-      // YUV→RGB & inferensi jadi berat. Default kita batasi di 720p (high),
-      // yang merupakan sweet-spot kualitas vs performa.
-      ResolutionPreset preset = ResolutionPreset.high; // ~720p
+      // Resolusi preview. Untuk preview lancar, 720p sudah ideal.
+      ResolutionPreset preset = ResolutionPreset.high;
       switch (EnvConfig.cameraResolution.toLowerCase()) {
-        case 'low': // ~240p
+        case 'low':
           preset = ResolutionPreset.low;
           break;
-        case 'medium': // ~480p
+        case 'medium':
           preset = ResolutionPreset.medium;
           break;
-        case 'high': // ~720p (disarankan)
+        case 'high':
           preset = ResolutionPreset.high;
           break;
-        case 'veryhigh': // ~1080p (maksimal yang masih wajar untuk stream)
-          preset = ResolutionPreset.veryHigh;
-          break;
-        // 'max' sengaja TIDAK dipetakan ke ResolutionPreset.max untuk live
-        // stream agar tidak memicu lag berat. Dibatasi ke 1080p.
+        case 'veryhigh':
         case 'max':
           preset = ResolutionPreset.veryHigh;
           break;
@@ -62,19 +69,67 @@ class CameraService {
         camera,
         preset,
         enableAudio: false,
-        imageFormatGroup: Platform.isAndroid 
-            ? ImageFormatGroup.yuv420 
-            : ImageFormatGroup.bgra8888,
+        // Tidak perlu set imageFormatGroup karena kita tidak pakai
+        // startImageStream lagi.
       );
 
       await _controller!.initialize();
+
+      // Optimasi: set flash off dan focus mode continuous untuk performa.
+      try {
+        await _controller!.setFlashMode(FlashMode.off);
+        await _controller!.setFocusMode(FocusMode.auto);
+      } catch (_) {
+        // Abaikan jika device tidak support.
+      }
     } catch (e) {
       debugPrint('CameraService.initialize error: $e');
       rethrow;
     }
   }
 
-  /// Mulai stream dari kamera
+  /// Mulai inferensi periodik. Mengambil gambar setiap [interval] dan
+  /// memanggil [onCapture] dengan path file-nya.
+  ///
+  /// Preview kamera tetap berjalan mulus karena TIDAK menggunakan
+  /// `startImageStream`. Capture dilakukan via `takePicture()` yang berjalan
+  /// di native thread terpisah.
+  Future<void> startPeriodicCapture({
+    required Future<void> Function(String filePath) onCapture,
+    Duration interval = const Duration(milliseconds: 1500),
+  }) async {
+    if (!isInitialized) await initialize();
+    if (_isStreaming) return;
+
+    _isStreaming = true;
+
+    // Tunggu sebentar agar preview render stabil sebelum mulai capture.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    bool isCapturing = false;
+
+    _captureTimer = Timer.periodic(interval, (timer) async {
+      if (!_isStreaming || isCapturing) return;
+      if (_controller == null || !_controller!.value.isInitialized) return;
+
+      isCapturing = true;
+      try {
+        final xFile = await _controller!.takePicture();
+        await onCapture(xFile.path);
+        // Hapus file temp setelah diproses agar tidak menumpuk.
+        try {
+          await File(xFile.path).delete();
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('CameraService.periodicCapture error: $e');
+      } finally {
+        isCapturing = false;
+      }
+    });
+  }
+
+  /// Mulai stream kamera klasik (fallback jika periodic capture tidak cocok).
+  /// PERINGATAN: Ini bisa menyebabkan jank di UI thread pada device mid-range.
   Future<void> startStream(Function(CameraImage imageFrame) onFrame) async {
     if (!isInitialized) await initialize();
     if (_isStreaming) return;
@@ -89,20 +144,30 @@ class CameraService {
     }
   }
 
-  /// Hentikan stream kamera
+  /// Hentikan stream/capture kamera
   Future<void> stopStream() async {
-    if (!isInitialized || !_isStreaming) return;
-    
-    try {
-      await _controller!.stopImageStream();
+    _captureTimer?.cancel();
+    _captureTimer = null;
+
+    if (!isInitialized || !_isStreaming) {
       _isStreaming = false;
-    } catch (e) {
-      debugPrint('CameraService.stopStream error: $e');
+      return;
     }
+
+    try {
+      // Coba stop image stream (jika sedang aktif dalam mode stream klasik)
+      if (_controller!.value.isStreamingImages) {
+        await _controller!.stopImageStream();
+      }
+    } catch (_) {}
+
+    _isStreaming = false;
   }
 
   /// Membersihkan resource kamera untuk mencegah memory leak
   void dispose() {
+    _captureTimer?.cancel();
+    _captureTimer = null;
     _controller?.dispose();
     _controller = null;
     _isStreaming = false;
