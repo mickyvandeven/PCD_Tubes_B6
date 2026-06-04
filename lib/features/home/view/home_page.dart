@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,6 +20,7 @@ class _HomePageState extends State<HomePage> {
   late final HiveService _hive;
 
   double _consumedFat = 0.0;
+  double _consumedCalories = 0.0;
   int _todayScanCount = 0;
   double _avgFatPerScan = 0.0;
   ScanResultModel? _latestScan;
@@ -26,6 +28,7 @@ class _HomePageState extends State<HomePage> {
 
   String _userName = 'Pengguna';
   double _maxFat = 65.0;
+  double _maxCalories = 2000.0;
 
   @override
   void initState() {
@@ -40,8 +43,10 @@ class _HomePageState extends State<HomePage> {
       final profile = _hive.getProfile();
       _userName = profile?.nama ?? 'Pengguna';
       _maxFat = profile?.targetLemakHarian ?? 65.0;
+      _maxCalories = profile?.targetKaloriHarian ?? 2000.0;
 
       _consumedFat = _repo.getTodayTotalFat();
+      _consumedCalories = _repo.getTodayTotalCalories();
       _todayScanCount = _repo.getTodayScanCount();
       _avgFatPerScan = _repo.getAverageFatPerScan();
       _latestScan = _repo.getLatestScan();
@@ -49,17 +54,18 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  int get _percent => _maxFat > 0 ? ((_consumedFat / _maxFat) * 100).round().clamp(0, 100) : 0;
+  int get _calPercent => _maxCalories > 0 ? ((_consumedCalories / _maxCalories) * 100).round().clamp(0, 100) : 0;
+  int get _fatPercent => _maxFat > 0 ? ((_consumedFat / _maxFat) * 100).round().clamp(0, 100) : 0;
 
-  String get _statusLabel {
-    final ratio = _maxFat > 0 ? (_consumedFat / _maxFat) : 0;
-    if (ratio < 0.5) return 'On Track';
-    if (ratio < 0.9) return 'Getting Close';
-    return 'Over Limit!';
+  String get _calStatusLabel {
+    final ratio = _maxCalories > 0 ? (_consumedCalories / _maxCalories) : 0;
+    if (ratio < 0.5) return 'Sesuai Target';
+    if (ratio < 0.9) return 'Hampir Penuh';
+    return 'Melebihi Batas!';
   }
 
-  Color get _statusColor {
-    final ratio = _maxFat > 0 ? (_consumedFat / _maxFat) : 0;
+  Color get _calStatusColor {
+    final ratio = _maxCalories > 0 ? (_consumedCalories / _maxCalories) : 0;
     if (ratio < 0.5) return const Color(0xFF2D7A4F);
     if (ratio < 0.9) return const Color(0xFFFFC947);
     return const Color(0xFFFF5C6B);
@@ -100,50 +106,47 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                _DailyGoalsCard(
+                  consumedCalories: _consumedCalories,
+                  maxCalories: _maxCalories,
+                  consumedFat: _consumedFat,
+                  maxFat: _maxFat,
+                  calPercent: _calPercent,
+                  calStatusLabel: _calStatusLabel,
+                  calStatusColor: _calStatusColor,
+                  latestScan: _latestScan,
+                  onScanTap: () async {
+                    await context.push('/scanner');
+                    _loadData();
+                  },
+                ),
+                const SizedBox(height: 16),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      flex: 3,
-                      child: _DailyFatCard(
-                        consumedFat: _consumedFat,
-                        maxFat: _maxFat,
-                        percent: _percent,
-                        statusLabel: _statusLabel,
-                        statusColor: _statusColor,
-                        latestScan: _latestScan,
-                        onScanTap: () async {
-                          await context.push('/scanner');
-                          _loadData();
-                        },
+                      child: _QuickStatCard(
+                        icon: Icons.restaurant_menu,
+                        iconColor: const Color(0xFF2D7A4F),
+                        title: 'Total Scan',
+                        value: '$_todayScanCount',
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          _QuickStatCard(
-                            icon: Icons.restaurant_menu,
-                            iconColor: const Color(0xFF2D7A4F),
-                            title: 'Scanned Today',
-                            value: '$_todayScanCount items',
-                          ),
-                          const SizedBox(height: 12),
-                          _QuickStatCard(
-                            icon: Icons.water_drop_outlined,
-                            iconColor: const Color(0xFFB8D34B),
-                            title: 'Avg Fat',
-                            value: '${_avgFatPerScan.toStringAsFixed(1)}g /meal',
-                          ),
-                          const SizedBox(height: 12),
-                          _QuickStatCard(
-                            icon: Icons.track_changes_rounded,
-                            iconColor: const Color(0xFFFFC947),
-                            title: 'Target',
-                            value: '${_maxFat.toStringAsFixed(0)}g',
-                          ),
-                        ],
+                      child: _QuickStatCard(
+                        icon: Icons.water_drop_outlined,
+                        iconColor: const Color(0xFFB8D34B),
+                        title: 'Rata Lemak',
+                        value: '${_avgFatPerScan.toStringAsFixed(1)}g',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _QuickStatCard(
+                        icon: Icons.track_changes_rounded,
+                        iconColor: const Color(0xFFFFC947),
+                        title: 'Max Lemak',
+                        value: '${_maxFat.toStringAsFixed(0)}g',
                       ),
                     ),
                   ],
@@ -178,7 +181,7 @@ class _HomePageState extends State<HomePage> {
                   )
                 else
                   SizedBox(
-                    height: 200,
+                    height: 245,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _recentScans.length,
@@ -295,22 +298,23 @@ class _RealScanCard extends StatelessWidget {
               height: 86,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _accentColor.withOpacity(0.85),
-                    _accentColor.withOpacity(0.18),
-                  ],
-                ),
+                color: _accentColor.withOpacity(0.2),
+                image: scan.imagePath.isNotEmpty && File(scan.imagePath).existsSync()
+                    ? DecorationImage(
+                        image: FileImage(File(scan.imagePath)),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child: Center(
-                child: Icon(
-                  Icons.qr_code_scanner_rounded,
-                  color: Colors.white.withOpacity(0.95),
-                  size: 38,
-                ),
-              ),
+              child: scan.imagePath.isEmpty || !File(scan.imagePath).existsSync()
+                  ? Center(
+                      child: Icon(
+                        Icons.image_not_supported_rounded,
+                        color: _accentColor.withOpacity(0.8),
+                        size: 38,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 10),
             Text(
@@ -343,12 +347,12 @@ class _RealScanCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _TagChip(
-                  label: 'Fat: ${scan.totalFat.toStringAsFixed(1)}g',
+                  label: 'Lemak: ${scan.totalFat.toStringAsFixed(1)}g',
                   background: tagColor,
                   textColor: _accentColor,
                 ),
                 _TagChip(
-                  label: '${scan.totalCalories.toStringAsFixed(0)} kcal',
+                  label: '${scan.totalCalories.toStringAsFixed(0)} kkal',
                   background: const Color(0xFFEBF4E8),
                   textColor: const Color(0xFF4D7060),
                 ),
@@ -409,22 +413,26 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _DailyFatCard extends StatelessWidget {
-  const _DailyFatCard({
+class _DailyGoalsCard extends StatelessWidget {
+  const _DailyGoalsCard({
+    required this.consumedCalories,
+    required this.maxCalories,
     required this.consumedFat,
     required this.maxFat,
-    required this.percent,
-    required this.statusLabel,
-    required this.statusColor,
+    required this.calPercent,
+    required this.calStatusLabel,
+    required this.calStatusColor,
     required this.latestScan,
     required this.onScanTap,
   });
 
+  final double consumedCalories;
+  final double maxCalories;
   final double consumedFat;
   final double maxFat;
-  final int percent;
-  final String statusLabel;
-  final Color statusColor;
+  final int calPercent;
+  final String calStatusLabel;
+  final Color calStatusColor;
   final ScanResultModel? latestScan;
   final VoidCallback onScanTap;
 
@@ -448,7 +456,7 @@ class _DailyFatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Daily Fat Target',
+            'Target Harian',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: const Color(0xFF1C3028),
               fontWeight: FontWeight.w700,
@@ -456,7 +464,7 @@ class _DailyFatCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Keep it balanced today.',
+            'Jaga pola makan seimbang hari ini.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF4D7060)),
@@ -469,29 +477,33 @@ class _DailyFatCard extends StatelessWidget {
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _FatSummaryText(
+                        _GoalsSummaryText(
+                          consumedCalories: consumedCalories,
+                          maxCalories: maxCalories,
                           consumedFat: consumedFat,
                           maxFat: maxFat,
-                          statusLabel: statusLabel,
-                          statusColor: statusColor,
+                          statusLabel: calStatusLabel,
+                          statusColor: calStatusColor,
                         ),
                         const SizedBox(height: 16),
-                        Center(child: _ProgressRing(percent: percent)),
+                        Center(child: _ProgressRing(percent: calPercent)),
                       ],
                     )
                   : Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: _FatSummaryText(
+                          child: _GoalsSummaryText(
+                            consumedCalories: consumedCalories,
+                            maxCalories: maxCalories,
                             consumedFat: consumedFat,
                             maxFat: maxFat,
-                            statusLabel: statusLabel,
-                            statusColor: statusColor,
+                            statusLabel: calStatusLabel,
+                            statusColor: calStatusColor,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        _ProgressRing(percent: percent),
+                        _ProgressRing(percent: calPercent),
                       ],
                     );
 
@@ -517,8 +529,8 @@ class _DailyFatCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     latestScan != null
-                        ? 'Scan terakhir: ${latestScan!.foods.isNotEmpty ? latestScan!.foods.first.name : "—"} • ${latestScan!.status} • Fat: ${latestScan!.totalFat.toStringAsFixed(1)}g'
-                        : 'Belum ada scan terakhir',
+                        ? 'Scan terakhir: ${latestScan!.foods.isNotEmpty ? latestScan!.foods.first.name : "—"} • Lemak: ${latestScan!.totalFat.toStringAsFixed(1)}g'
+                        : 'Belum ada scan hari ini',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: const Color(0xFF4D7060),
                       fontWeight: FontWeight.w500,
@@ -589,7 +601,7 @@ class _ProgressRing extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               const Text(
-                'Consumed',
+                'Terpakai',
                 style: TextStyle(
                   color: Color(0xFF4D7060),
                   fontSize: 12,
@@ -604,14 +616,18 @@ class _ProgressRing extends StatelessWidget {
   }
 }
 
-class _FatSummaryText extends StatelessWidget {
-  const _FatSummaryText({
+class _GoalsSummaryText extends StatelessWidget {
+  const _GoalsSummaryText({
+    required this.consumedCalories,
+    required this.maxCalories,
     required this.consumedFat,
     required this.maxFat,
     required this.statusLabel,
     required this.statusColor,
   });
 
+  final double consumedCalories;
+  final double maxCalories;
   final double consumedFat;
   final double maxFat;
   final String statusLabel;
@@ -623,7 +639,7 @@ class _FatSummaryText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${consumedFat.toStringAsFixed(1)}g',
+          '${consumedCalories.toStringAsFixed(0)} kkal',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             color: const Color(0xFF2D7A4F),
             fontWeight: FontWeight.w800,
@@ -631,7 +647,7 @@ class _FatSummaryText extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '/ ${maxFat.toStringAsFixed(0)} g target',
+          '/ ${maxCalories.toStringAsFixed(0)} kkal (Target)',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xFF4D7060),
             fontWeight: FontWeight.w600,
@@ -651,6 +667,22 @@ class _FatSummaryText extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F5F1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'Lemak: ${consumedFat.toStringAsFixed(1)}g / Target: ${maxFat.toStringAsFixed(0)}g',
+            style: const TextStyle(
+              color: Color(0xFF4D7060),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
@@ -674,31 +706,39 @@ class _QuickStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         color: const Color(0xFFFFFFFF),
         border: Border.all(color: const Color(0xFFC8E2D0)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, color: iconColor, size: 18),
+          Icon(icon, color: iconColor, size: 22),
           const SizedBox(height: 10),
           Text(
             title,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF9AB5A5),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF9AB5A5),
               fontWeight: FontWeight.w600,
+              fontSize: 11,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF1C3028),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF1C3028),
               fontWeight: FontWeight.w800,
+              fontSize: 14,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
