@@ -31,23 +31,31 @@ class CameraService {
         orElse: () => cameras.first,
       );
 
-      ResolutionPreset preset = ResolutionPreset.medium;
+      // ANTI-LAG: untuk preview + stream real-time, JANGAN gunakan resolusi
+      // maksimum. Resolusi tinggi membuat buffer frame besar sehingga konversi
+      // YUV→RGB & inferensi jadi berat. Default kita batasi di 720p (high),
+      // yang merupakan sweet-spot kualitas vs performa.
+      ResolutionPreset preset = ResolutionPreset.high; // ~720p
       switch (EnvConfig.cameraResolution.toLowerCase()) {
-        case 'low':
+        case 'low': // ~240p
           preset = ResolutionPreset.low;
           break;
-        case 'high':
+        case 'medium': // ~480p
+          preset = ResolutionPreset.medium;
+          break;
+        case 'high': // ~720p (disarankan)
           preset = ResolutionPreset.high;
           break;
-        case 'veryhigh':
+        case 'veryhigh': // ~1080p (maksimal yang masih wajar untuk stream)
           preset = ResolutionPreset.veryHigh;
           break;
+        // 'max' sengaja TIDAK dipetakan ke ResolutionPreset.max untuk live
+        // stream agar tidak memicu lag berat. Dibatasi ke 1080p.
         case 'max':
-          preset = ResolutionPreset.max;
+          preset = ResolutionPreset.veryHigh;
           break;
-        case 'medium':
         default:
-          preset = ResolutionPreset.medium;
+          preset = ResolutionPreset.high;
       }
 
       _controller = CameraController(

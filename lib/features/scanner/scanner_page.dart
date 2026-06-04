@@ -483,8 +483,10 @@ class _CameraStreamView extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CameraPreview(controller),
-          
+          // ANTI-GEPENG: preview ditampilkan dengan aspect ratio yang benar
+          // lalu di-cover ke layar (tanpa distorsi/stretch).
+          _CoverCameraPreview(controller: controller),
+
           // Gambar Bounding Box dari hasil AI Mock
           if (provider.currentDetections.isNotEmpty)
             Positioned.fill(
@@ -529,6 +531,48 @@ class _CameraStreamView extends StatelessWidget {
             ),
           )
         ],
+      ),
+    );
+  }
+}
+
+/// Menampilkan [CameraPreview] dengan rasio aspek yang benar lalu "cover"
+/// ke seluruh layar — meniru perilaku `BoxFit.cover` tanpa distorsi.
+///
+/// CARA KERJA (anti-gepeng):
+/// 1. `controller.value.aspectRatio` selalu dilaporkan dalam orientasi
+///    LANDSCAPE oleh plugin kamera (mis. 16/9 ≈ 1.78), sedangkan layar HP
+///    dalam keadaan portrait punya rasio < 1 (mis. 1080/2340 ≈ 0.46).
+/// 2. Jika preview ditaruh apa adanya, Flutter akan meregangkannya mengikuti
+///    bentuk layar → gambar jadi gepeng. Untuk menghindarinya kita hitung
+///    faktor `scale` yang membandingkan rasio layar vs rasio kamera.
+/// 3. `Transform.scale` memperbesar preview secara PROPORSIONAL hingga sisi
+///    terpendek memenuhi layar; sisa yang melebihi layar dipotong oleh
+///    `ClipRect`. Hasilnya preview penuh layar, tidak gepeng, tidak ada bar
+///    hitam.
+class _CoverCameraPreview extends StatelessWidget {
+  const _CoverCameraPreview({required this.controller});
+
+  final CameraController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
+    // size.aspectRatio = lebar/tinggi layar (portrait → < 1).
+    // controller.value.aspectRatio = rasio kamera (landscape → > 1).
+    var scale = size.aspectRatio * controller.value.aspectRatio;
+
+    // Bila hasilnya < 1 berarti preview belum menutupi layar; balik agar
+    // selalu memperbesar (cover), bukan memperkecil (contain).
+    if (scale < 1) scale = 1 / scale;
+
+    return ClipRect(
+      child: Transform.scale(
+        scale: scale,
+        child: Center(
+          child: CameraPreview(controller),
+        ),
       ),
     );
   }

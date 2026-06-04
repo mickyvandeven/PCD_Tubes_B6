@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:isolate';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -13,130 +14,251 @@ class InferenceResult {
   InferenceResult(this.detections);
 }
 
-/// InferenceService — Jalankan model TFLite langsung di main thread
-/// untuk debugging. Setelah terbukti jalan, bisa dipindah ke Isolate.
+/// InferenceService
+///
+/// Menjalankan seluruh pipeline berat (konversi YUV→RGB, resize, dan
+/// `Interpreter.run`) di dalam **background isolate** agar UI thread tetap
+/// bebas. Tanpa ini, preview kamera akan tersendat (ngelag) karena setiap
+/// frame memblokir thread render.
+///
+/// Tambahan optimasi anti-lag:
+/// - Throttle frame: maksimal ~5 FPS untuk inferensi (tidak memproses 30 FPS).
+/// - Backpressure: frame baru hanya dikirim bila isolate sedang idle.
 class InferenceService {
-  Interpreter? _interpreter;
-  bool _isProcessing = false;
+  Isolate? _isolate;
+  SendPort? _workerSendPort;
+  ReceivePort? _receivePort;
+
   bool _isReady = false;
-  
+  bool _isBusy = false;
+
+  /// Batasi laju inferensi. 200ms ≈ 5 FPS. Model ML tidak perlu 30 FPS.
+  static const Duration _minFrameInterval = Duration(milliseconds: 200);
+  DateTime _lastFrameTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   Function(InferenceResult)? onResult;
 
+  // Untuk inferensi sekali jalan (galeri) yang butuh nilai balik.
+  final Map<int, Completer<List<dynamic>>> _fileRequests = {};
+  int _fileRequestId = 0;
+
+  bool get isReady => _isReady;
+
   Future<void> init() async {
+    if (_isReady) return;
     try {
-      _interpreter = await Interpreter.fromAsset('assets/models/fatscan_v2.tflite');
-      
-      debugPrint('=== MODEL LOADED ===');
-      for (var t in _interpreter!.getInputTensors()) {
-        debugPrint('INPUT -> Name: ${t.name}, Shape: ${t.shape}, Type: ${t.type}');
-      }
-      for (var t in _interpreter!.getOutputTensors()) {
-        debugPrint('OUTPUT -> Name: ${t.name}, Shape: ${t.shape}, Type: ${t.type}');
-      }
-      
+      // Muat byte model DI MAIN ISOLATE (punya akses rootBundle), lalu kirim
+      // ke worker. Dengan begitu worker tidak perlu binary-messenger token.
+      final modelData =
+          await rootBundle.load('assets/models/fatscan_v2.tflite');
+      final modelBytes = modelData.buffer
+          .asUint8List(modelData.offsetInBytes, modelData.lengthInBytes);
+
+      _receivePort = ReceivePort();
+      final readyCompleter = Completer<void>();
+
+      _receivePort!.listen((message) {
+        if (message is SendPort) {
+          // Handshake: worker mengirim port perintahnya.
+          _workerSendPort = message;
+          if (!readyCompleter.isCompleted) readyCompleter.complete();
+        } else if (message is _StreamResult) {
+          _isBusy = false; // Lepas backpressure, siap frame berikutnya.
+          onResult?.call(InferenceResult(message.detections));
+        } else if (message is _FileResult) {
+          _fileRequests.remove(message.id)?.complete(message.detections);
+        }
+      });
+
+      _isolate = await Isolate.spawn(
+        _workerEntry,
+        _WorkerInit(_receivePort!.sendPort, modelBytes),
+      );
+
+      await readyCompleter.future;
       _isReady = true;
+      debugPrint('✅ InferenceService ready (background isolate)');
     } catch (e) {
-      debugPrint('❌ Error loading model: $e');
+      debugPrint('❌ InferenceService init error: $e');
       _isReady = false;
     }
   }
 
+  /// Dipanggil dari stream kamera (30 FPS). Sangat ringan: hanya menyalin
+  /// byte plane lalu mengirim ke isolate. Frame di-drop bila terlalu cepat
+  /// atau isolate masih sibuk.
   void runInference(CameraImage image, [int rotation = 0]) {
-    if (!_isReady || _interpreter == null || _isProcessing) return;
-    _isProcessing = true;
-    
-    try {
-      // 1. Konversi YUV420/BGRA ke RGB Image penuh warna!
-      final planes = image.planes.map((p) => p.bytes).toList();
-      final bytesPerRow = image.planes.map((p) => p.bytesPerRow).toList();
-      final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-      
-      img.Image? colorImage = FramePreprocessor.convertBytesToImage(
-        planes, bytesPerRow, image.width, image.height, isIOS
-      );
-      
-      if (colorImage == null) {
-        _isProcessing = false;
-        return;
-      }
-      
-      // 2. Rotate 90 derajat jika di Android (portrait)
-      if (!isIOS) {
-        colorImage = img.copyRotate(colorImage, angle: 90);
-      }
-      
-      // 3. Buat tensor input menggunakan FramePreprocessor
-      final inputTensor = _interpreter!.getInputTensors().first;
-      final isQuantized = inputTensor.type == TensorType.uint8 || inputTensor.type == TensorType.int8;
-      
-      var inputData = FramePreprocessor.imageToTensor(colorImage, 224, isQuantized);
-      
-      // 5. Setup output buffer [1, 33, 1029]
-      final outputTensor = _interpreter!.getOutputTensors().first;
-      final outputShape = outputTensor.shape; // [1, 33, 1029]
-      
-      var outputData = List.generate(
-        outputShape[0],
-        (_) => List.generate(
-          outputShape[1],
-          (_) => List.filled(outputShape[2], 0.0),
-        ),
-      );
-      
-      // 6. Run!
-      _interpreter!.run(inputData, outputData);
-      
-      // 7. Parse (Naikkan threshold ke 40% agar tidak asal tebak)
-      final detections = ResultParser.parseYolo(outputData, 0.40);
-      
-      debugPrint('🔍 Detections: ${detections.length}');
-      for (var d in detections) {
-        debugPrint('  -> ${d['label']} (${(d['confidence'] * 100).toStringAsFixed(1)}%)');
-      }
-      
-      onResult?.call(InferenceResult(detections));
-    } catch (e) {
-      debugPrint('❌ Inference error: $e');
-      onResult?.call(InferenceResult([]));
-    } finally {
-      _isProcessing = false;
-    }
+    if (!_isReady || _workerSendPort == null || _isBusy) return;
+
+    final now = DateTime.now();
+    if (now.difference(_lastFrameTime) < _minFrameInterval) return;
+    _lastFrameTime = now;
+    _isBusy = true;
+
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    _workerSendPort!.send(
+      _FramePayload(
+        planes: image.planes.map((p) => p.bytes).toList(),
+        bytesPerRow: image.planes.map((p) => p.bytesPerRow).toList(),
+        width: image.width,
+        height: image.height,
+        isIOS: isIOS,
+      ),
+    );
   }
 
+  /// Inferensi sekali jalan dari file (galeri). Tetap di isolate agar decode
+  /// gambar besar tidak menahan UI thread.
   Future<List<dynamic>> runInferenceOnFile(String filePath) async {
-    if (!_isReady || _interpreter == null) return [];
+    if (!_isReady) await init(); // Pastikan worker siap (mis. dipanggil cepat).
+    if (!_isReady || _workerSendPort == null) return [];
     try {
-      final fileData = await File(filePath).readAsBytes();
-      img.Image? colorImage = img.decodeImage(fileData);
-      if (colorImage == null) return [];
-
-      final inputTensor = _interpreter!.getInputTensors().first;
-      final isQuantized = inputTensor.type == TensorType.uint8 || inputTensor.type == TensorType.int8;
-      var inputData = FramePreprocessor.imageToTensor(colorImage, 224, isQuantized);
-      
-      final outputTensor = _interpreter!.getOutputTensors().first;
-      final outputShape = outputTensor.shape;
-      
-      var outputData = List.generate(
-        outputShape[0],
-        (_) => List.generate(
-          outputShape[1],
-          (_) => List.filled(outputShape[2], 0.0),
-        ),
-      );
-      
-      _interpreter!.run(inputData, outputData);
-      final detections = ResultParser.parseYolo(outputData, 0.40);
-      return detections;
+      final bytes = await File(filePath).readAsBytes();
+      final id = _fileRequestId++;
+      final completer = Completer<List<dynamic>>();
+      _fileRequests[id] = completer;
+      _workerSendPort!.send(_FilePayload(id, bytes));
+      return await completer.future
+          .timeout(const Duration(seconds: 10), onTimeout: () => []);
     } catch (e) {
-      debugPrint('Inference on file error: $e');
+      debugPrint('runInferenceOnFile error: $e');
       return [];
     }
   }
 
   void dispose() {
-    _interpreter?.close();
-    _interpreter = null;
+    try {
+      _workerSendPort?.send(_kClose);
+    } catch (_) {}
+    _receivePort?.close();
+    _isolate?.kill(priority: Isolate.immediate);
+    _isolate = null;
+    _workerSendPort = null;
+    _receivePort = null;
     _isReady = false;
+    _isBusy = false;
+    _fileRequests.clear();
   }
+}
+
+// ─── Protokol pesan isolate ───────────────────────────────────────────────
+
+const String _kClose = '__close__';
+
+class _WorkerInit {
+  final SendPort sendPort;
+  final Uint8List modelBytes;
+  _WorkerInit(this.sendPort, this.modelBytes);
+}
+
+class _FramePayload {
+  final List<Uint8List> planes;
+  final List<int> bytesPerRow;
+  final int width;
+  final int height;
+  final bool isIOS;
+  _FramePayload({
+    required this.planes,
+    required this.bytesPerRow,
+    required this.width,
+    required this.height,
+    required this.isIOS,
+  });
+}
+
+class _StreamResult {
+  final List<dynamic> detections;
+  _StreamResult(this.detections);
+}
+
+class _FilePayload {
+  final int id;
+  final Uint8List bytes;
+  _FilePayload(this.id, this.bytes);
+}
+
+class _FileResult {
+  final int id;
+  final List<dynamic> detections;
+  _FileResult(this.id, this.detections);
+}
+
+// ─── Entry point background isolate ───────────────────────────────────────
+//
+// Berjalan di thread terpisah. Memuat interpreter dari buffer model, lalu
+// memproses setiap frame/file yang dikirim main isolate.
+void _workerEntry(_WorkerInit init) {
+  late final Interpreter interpreter;
+  try {
+    interpreter = Interpreter.fromBuffer(
+      init.modelBytes,
+      options: InterpreterOptions()..threads = 2,
+    );
+  } catch (e) {
+    // Beri tahu main isolate bahwa worker gagal (kirim hasil kosong).
+    init.sendPort.send(_StreamResult(const []));
+    return;
+  }
+
+  final inputTensor = interpreter.getInputTensors().first;
+  final isQuantized = inputTensor.type == TensorType.uint8 ||
+      inputTensor.type == TensorType.int8;
+  final outputShape = interpreter.getOutputTensors().first.shape;
+
+  List<List<List<double>>> makeOutputBuffer() => List.generate(
+        outputShape[0],
+        (_) => List.generate(
+          outputShape[1],
+          (_) => List.filled(outputShape[2], 0.0),
+        ),
+      );
+
+  List<dynamic> runOnImage(img.Image image) {
+    final input = FramePreprocessor.imageToTensor(image, 224, isQuantized);
+    final output = makeOutputBuffer();
+    interpreter.run(input, output);
+    return ResultParser.parseYolo(output, 0.40);
+  }
+
+  final port = ReceivePort();
+  init.sendPort.send(port.sendPort); // Handshake.
+
+  port.listen((msg) {
+    if (msg is _FramePayload) {
+      try {
+        img.Image? colorImage = FramePreprocessor.convertBytesToImage(
+          msg.planes,
+          msg.bytesPerRow,
+          msg.width,
+          msg.height,
+          msg.isIOS,
+        );
+        if (colorImage == null) {
+          init.sendPort.send(_StreamResult(const []));
+          return;
+        }
+        // Android stream landscape → putar 90° agar sesuai orientasi portrait.
+        if (!msg.isIOS) {
+          colorImage = img.copyRotate(colorImage, angle: 90);
+        }
+        init.sendPort.send(_StreamResult(runOnImage(colorImage)));
+      } catch (_) {
+        init.sendPort.send(_StreamResult(const []));
+      }
+    } else if (msg is _FilePayload) {
+      try {
+        final image = img.decodeImage(msg.bytes);
+        if (image == null) {
+          init.sendPort.send(_FileResult(msg.id, const []));
+          return;
+        }
+        init.sendPort.send(_FileResult(msg.id, runOnImage(image)));
+      } catch (_) {
+        init.sendPort.send(_FileResult(msg.id, const []));
+      }
+    } else if (msg == _kClose) {
+      interpreter.close();
+      port.close();
+    }
+  });
 }
