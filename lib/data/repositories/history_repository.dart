@@ -76,11 +76,24 @@ class HistoryRepository {
 		return getTodayHistory().fold(0.0, (sum, scan) => sum + scan.totalFat);
 	}
 
+	/// Hitung total kalori hari ini
+	double getTodayTotalCalories() {
+		return getTodayHistory().fold(0.0, (sum, scan) => sum + scan.totalCalories);
+	}
+
 	/// Hitung rata-rata lemak per scan (semua waktu)
 	double getAverageFatPerScan() {
 		final all = _hive.getAllScans();
 		if (all.isEmpty) return 0.0;
 		final total = all.fold(0.0, (sum, scan) => sum + scan.totalFat);
+		return total / all.length;
+	}
+
+	/// Hitung rata-rata kalori per scan (semua waktu)
+	double getAverageCaloriesPerScan() {
+		final all = _hive.getAllScans();
+		if (all.isEmpty) return 0.0;
+		final total = all.fold(0.0, (sum, scan) => sum + scan.totalCalories);
 		return total / all.length;
 	}
 
