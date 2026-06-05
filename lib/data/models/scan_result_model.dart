@@ -52,15 +52,30 @@ class FoodItem extends HiveObject {
     double? calories,
     double? fat,
   }) {
+    final resolvedGrams        = grams          ?? this.grams;
+    final resolvedDefaultGrams = defaultGrams   ?? this.defaultGrams;
+    final resolvedDefaultFat   = defaultFat     ?? this.defaultFat;
+    final resolvedDefaultCal   = defaultCalories ?? this.defaultCalories;
+
+    // Jika fat / calories tidak diisi eksplisit, hitung ulang dari grams baru
+    final resolvedFat = fat ??
+        (resolvedDefaultGrams > 0
+            ? (resolvedGrams / resolvedDefaultGrams) * resolvedDefaultFat
+            : 0.0);
+    final resolvedCalories = calories ??
+        (resolvedDefaultGrams > 0
+            ? (resolvedGrams / resolvedDefaultGrams) * resolvedDefaultCal
+            : 0.0);
+
     return FoodItem(
-      name: name ?? this.name,
-      grams: grams ?? this.grams,
-      defaultGrams: defaultGrams ?? this.defaultGrams,
-      defaultFat: defaultFat ?? this.defaultFat,
-      defaultCalories: defaultCalories ?? this.defaultCalories,
-      confidence: confidence ?? this.confidence,
-      calories: calories ?? this.calories,
-      fat: fat ?? this.fat,
+      name:            name            ?? this.name,
+      grams:           resolvedGrams,
+      defaultGrams:    resolvedDefaultGrams,
+      defaultFat:      resolvedDefaultFat,
+      defaultCalories: resolvedDefaultCal,
+      confidence:      confidence      ?? this.confidence,
+      calories:        resolvedCalories,
+      fat:             resolvedFat,
     );
   }
 

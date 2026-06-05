@@ -148,23 +148,27 @@ class ScannerProvider extends ChangeNotifier {
     }
   }
 
-  /// Update gram makanan pada index tertentu dan hitung ulang
+  /// Update gram makanan pada index tertentu dan hitung ulang lemak + kalori
+  /// secara otomatis (real-time). Dipanggil saat tombol +/-, input teks,
+  /// maupun setelah gambar dari galeri/kamera disimpan.
   void updateGram(int index, double newGram) {
     if (_result == null) return;
     if (index < 0 || index >= _result!.foods.length) return;
 
     final updatedFoods = List<FoodItem>.from(_result!.foods);
+
+    // copyWith(grams: …) secara otomatis menghitung ulang fat & calories
+    // berdasarkan rumus: (grams / defaultGrams) * defaultFat/defaultCalories
     updatedFoods[index] = updatedFoods[index].copyWith(
       grams: newGram.clamp(1, 9999),
     );
 
+    // Hitung total lemak dari semua item (termasuk yang baru diperbarui)
+    final newTotalFat = updatedFoods.fold(0.0, (s, f) => s + f.fat);
+
     _result = _result!.copyWith(
       foods: updatedFoods,
-      status: _nutrition
-          .getFatStatus(
-            updatedFoods.fold(0.0, (s, f) => s + f.fat),
-          )
-          .shortLabel,
+      status: _nutrition.getFatStatus(newTotalFat).shortLabel,
     );
 
     notifyListeners();
