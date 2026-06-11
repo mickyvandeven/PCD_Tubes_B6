@@ -37,8 +37,22 @@ class MongoService {
     }
   }
 
+  Future<void> _ensureConnection() async {
+    if (_db == null || _db!.state != State.open) {
+      await init();
+      return;
+    }
+    try {
+      // Send a ping command to verify connection is alive
+      await _db!.pingCommand();
+    } catch (e) {
+      debugPrint('MongoDB connection dropped. Reconnecting... ($e)');
+      await init();
+    }
+  }
+
   Future<void> syncUserProfile(UserProfile profile, {String? password}) async {
-    if (!isConnected) return;
+    await _ensureConnection(); if (!isConnected) return;
     try {
       final usersCollection = _db!.collection('users');
       
@@ -80,7 +94,7 @@ class MongoService {
     required String password,
     required String nama,
   }) async {
-    if (!isConnected) throw Exception('Tidak terhubung ke database');
+    await _ensureConnection(); if (!isConnected) throw Exception('Tidak terhubung ke database');
     try {
       final usersCollection = _db!.collection('users');
       
@@ -112,7 +126,7 @@ class MongoService {
   /// Verifikasi email + password. Mengembalikan UserProfile jika valid,
   /// null jika password salah atau user tidak ditemukan.
   Future<UserProfile?> verifyLogin(String email, String password) async {
-    if (!isConnected) throw Exception('Tidak terhubung ke database');
+    await _ensureConnection(); if (!isConnected) throw Exception('Tidak terhubung ke database');
     try {
       final usersCollection = _db!.collection('users');
       final result = await usersCollection.findOne(where.eq('email', email));
@@ -148,8 +162,29 @@ class MongoService {
     }
   }
 
+  /// Mengubah password user yang sudah login
+  Future<bool> changePassword(String email, String oldPassword, String newPassword) async {
+    await _ensureConnection(); if (!isConnected) throw Exception('Tidak terhubung ke internet/database');
+    try {
+      // Verifikasi password lama
+      final verified = await verifyLogin(email, oldPassword);
+      if (verified == null) return false;
+
+      final usersCollection = _db!.collection('users');
+      await usersCollection.update(
+        where.eq('email', email),
+        modify.set('passwordHash', hashPassword(newPassword)),
+      );
+      debugPrint('Password changed for user: $email');
+      return true;
+    } catch (e) {
+      debugPrint('Failed to change password: $e');
+      throw Exception('Gagal mengubah password');
+    }
+  }
+
   Future<void> syncScanResult(ScanResultModel scan, String userId) async {
-    if (!isConnected) return;
+    await _ensureConnection(); if (!isConnected) throw Exception('Tidak terhubung ke internet/database');
     try {
       final scansCollection = _db!.collection('scan_results');
       
@@ -184,7 +219,7 @@ class MongoService {
   }
 
   Future<void> deleteScan(String scanId) async {
-    if (!isConnected) return;
+    await _ensureConnection(); if (!isConnected) return;
     try {
       final scansCollection = _db!.collection('scan_results');
       await scansCollection.remove(where.eq('_id', scanId));
@@ -195,7 +230,7 @@ class MongoService {
   }
 
   Future<UserProfile?> getUserByEmail(String email) async {
-    if (!isConnected) throw Exception('Tidak terhubung ke database');
+    await _ensureConnection(); if (!isConnected) throw Exception('Tidak terhubung ke database');
     try {
       final usersCollection = _db!.collection('users');
       final result = await usersCollection.findOne(where.eq('email', email));
@@ -222,7 +257,7 @@ class MongoService {
   }
 
   Future<List<ScanResultModel>> getHistoryByUserId(String userId) async {
-    if (!isConnected) return [];
+    await _ensureConnection(); if (!isConnected) return [];
     try {
       final scansCollection = _db!.collection('scan_results');
       final results = await scansCollection.find(where.eq('userId', userId)).toList();
@@ -246,6 +281,7 @@ class MongoService {
           imagePath: result['imagePath'] as String,
           foods: foodsList,
           status: result['status'] as String,
+          userId: result['userId'] as String? ?? userId,
         );
       }).toList();
     } catch (e) {

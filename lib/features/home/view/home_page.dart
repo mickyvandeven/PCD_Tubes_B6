@@ -7,6 +7,7 @@ import '../../../data/models/scan_result_model.dart';
 import '../../../data/models/user_profile_model.dart';
 import '../../../data/repositories/history_repository.dart';
 import '../../../data/services/hive_service.dart';
+import '../../../data/services/mongo_service.dart';
 import '../../../widgets/fat_bottom_nav.dart';
 
 class HomePage extends StatefulWidget {
@@ -37,6 +38,85 @@ class _HomePageState extends State<HomePage> {
     _repo = HistoryRepository();
     _hive = HiveService();
     _loadData();
+  }
+
+  Future<void> _handleRefresh() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final profile = _hive.getProfile();
+    if (profile == null) return;
+
+    try {
+      if (!MongoService().isConnected) {
+        throw Exception('Offline');
+      }
+      final unsyncedIds = _hive.unsyncedScans;
+      if (unsyncedIds.isNotEmpty) {
+        final allScans = _hive.scanBox.values.toList();
+        for (final id in unsyncedIds) {
+          final scan = allScans.cast<ScanResultModel?>().firstWhere(
+            (s) => s?.id == id,
+            orElse: () => null,
+          );
+          if (scan != null) {
+            try {
+              await MongoService().syncScanResult(scan, profile.id);
+              await _hive.removeUnsyncedScan(id);
+            } catch (_) {}
+          } else {
+            await _hive.removeUnsyncedScan(id);
+          }
+        }
+      }
+
+      final history = await MongoService().getHistoryByUserId(profile.id);
+      final remoteIds = history.map((s) => s.id).toSet();
+      final localScans = _hive.getAllScans();
+
+      int downloadedScans = 0;
+      int uploadedScans = 0;
+
+      // 1. Download dari cloud ke lokal
+      for (final scan in history) {
+        if (!_hive.scanBox.containsKey(scan.id)) {
+          await _hive.saveScan(scan.copyWith(userId: profile.id));
+          downloadedScans++;
+        }
+      }
+
+      // 2. Upload dari lokal ke cloud (jika data lokal belum ada di cloud)
+      for (final localScan in localScans) {
+        if (!remoteIds.contains(localScan.id)) {
+          try {
+            await MongoService().syncScanResult(localScan, profile.id);
+            uploadedScans++;
+          } catch (_) {}
+        }
+      }
+      
+      if (mounted) {
+        _loadData(); // reload dashboard stats
+        String msg = 'Data riwayat sudah sinkron.';
+        if (downloadedScans > 0 || uploadedScans > 0) {
+          msg = 'Sinkronisasi berhasil: $downloadedScans didownload, $uploadedScans diupload.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFF2D7A4F),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Anda sedang offline. Menampilkan riwayat lokal.'),
+            backgroundColor: Color(0xFFE53935),
+          ),
+        );
+      }
+    }
   }
 
   void _loadData() {
@@ -89,21 +169,26 @@ class _HomePageState extends State<HomePage> {
           currentIndex: 0,
           onScanTap: () async {
             await context.push('/scanner');
-          _loadData();
-        },
-        onTap: (index) {
-          if (index == 1)
-            context.go('/history');
-          else if (index == 2)
-            context.go('/profile');
-        },
-      ),
+            _loadData();
+          },
+          onTap: (index) {
+            if (index == 1)
+              context.go('/history');
+            else if (index == 2)
+              context.go('/profile');
+          },
+        ),
       body: Container(
         decoration: const BoxDecoration(color: Color(0xFFF5F8F2)),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-            child: Column(
+          child: RefreshIndicator(
+            color: const Color(0xFF2D7A4F),
+            backgroundColor: Colors.white,
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TopBar(userName: _userName),
@@ -206,6 +291,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+        ),
         ),
       ),
       ),

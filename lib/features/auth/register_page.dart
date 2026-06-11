@@ -74,8 +74,87 @@ class _RegisterViewState extends State<_RegisterView> {
       // Akun baru → lanjut ke setup profil dengan data awal.
       context.go('/profile-setup?edit=false', extra: result.googleData);
     } else if (result.message != null) {
-      _snack(result.message!);
+      if (result.message!.contains('sudah terdaftar')) {
+        _showAlreadyRegisteredDialog();
+      } else {
+        _snack(result.message!);
+      }
     }
+  }
+
+  void _showAlreadyRegisteredDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: AppColors.surface,
+        icon: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.warning.withValues(alpha: 0.12),
+          ),
+          child: const Icon(
+            Icons.mark_email_read_rounded,
+            color: AppColors.warning,
+            size: 28,
+          ),
+        ),
+        title: const Text(
+          'Email Sudah Terdaftar',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
+        content: const Text(
+          'Email yang kamu masukkan sudah terdaftar di sistem kami. '
+          'Silakan masuk menggunakan email tersebut atau gunakan email lain untuk mendaftar.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/login');
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Masuk Sekarang',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _onGoogle() async {
@@ -172,7 +251,7 @@ class _RegisterViewState extends State<_RegisterView> {
                 AuthTextField(
                   controller: _passwordCtrl,
                   label: 'Password',
-                  hint: 'Minimal 8 karakter',
+                  hint: 'Minimal 6 karakter',
                   icon: Icons.lock_outline_rounded,
                   isPassword: true,
                   textInputAction: TextInputAction.next,

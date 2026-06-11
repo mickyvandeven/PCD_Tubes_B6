@@ -143,9 +143,11 @@ class ProfilePage extends StatelessWidget {
       ),
     ];
 
-    const List<_SettingItem> settingItems = [
-      _SettingItem(icon: Icons.help_outline_rounded, title: 'Bantuan & FAQ'),
-      _SettingItem(icon: Icons.logout_rounded, title: 'Keluar', isLogout: true),
+    final List<_SettingItem> settingItems = [
+      const _SettingItem(icon: Icons.help_outline_rounded, title: 'Bantuan & FAQ', id: 'faq'),
+      if (!hive.isGuest)
+        const _SettingItem(icon: Icons.lock_outline_rounded, title: 'Ubah Password', id: 'password'),
+      const _SettingItem(icon: Icons.logout_rounded, title: 'Keluar', isLogout: true, id: 'logout'),
     ];
 
     return PopScope(
@@ -254,9 +256,15 @@ class ProfilePage extends StatelessWidget {
                             ? const Color(0xFFE53935)
                             : _accentColor,
                         cardColor: Colors.transparent,
-                        onTap: settingItems[i].isLogout
-                            ? () => _logout(context)
-                            : () => _showFAQ(context),
+                        onTap: () {
+                          if (settingItems[i].id == 'logout') {
+                            _logout(context);
+                          } else if (settingItems[i].id == 'password') {
+                            context.push('/edit-password');
+                          } else {
+                            _showFAQ(context);
+                          }
+                        },
                       ),
                       if (i < settingItems.length - 1)
                         const Divider(
@@ -663,10 +671,12 @@ class _SettingItem {
   const _SettingItem({
     required this.icon,
     required this.title,
+    required this.id,
     this.isLogout = false,
   });
 
   final IconData icon;
   final String title;
+  final String id;
   final bool isLogout;
 }

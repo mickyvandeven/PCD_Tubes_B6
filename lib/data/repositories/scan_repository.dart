@@ -93,7 +93,13 @@ class ScanRepository {
 		await _hive.saveScan(scan);
 		final profile = _hive.getProfile();
 		if (profile != null) {
-			MongoService().syncScanResult(scan, profile.id);
+			await _hive.addUnsyncedScan(scan.id);
+			try {
+				await MongoService().syncScanResult(scan, profile.id);
+				await _hive.removeUnsyncedScan(scan.id);
+			} catch (e) {
+				// Biarkan di antrian unsynced jika gagal
+			}
 		}
 	}
 

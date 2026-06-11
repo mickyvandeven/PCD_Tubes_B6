@@ -20,6 +20,89 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   String _selectedFilter = 'Semua';
 
+  Future<void> _handleRefresh() async {
+    // Memberikan sedikit waktu loading agar UI terasa smooth
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final profile = HiveService().getProfile();
+    if (profile == null) return;
+
+    try {
+      if (!MongoService().isConnected) {
+        throw Exception('Offline');
+      }
+      // 1. Upload unsynced local scans
+      final hive = HiveService();
+      final unsyncedIds = hive.unsyncedScans;
+      if (unsyncedIds.isNotEmpty) {
+        final allScans = hive.scanBox.values.toList();
+        for (final id in unsyncedIds) {
+          final scan = allScans.cast<ScanResultModel?>().firstWhere(
+            (s) => s?.id == id,
+            orElse: () => null,
+          );
+          if (scan != null) {
+            try {
+              await MongoService().syncScanResult(scan, profile.id);
+              await hive.removeUnsyncedScan(id);
+            } catch (_) {}
+          } else {
+            await hive.removeUnsyncedScan(id);
+          }
+        }
+      }
+
+      // 2. Download history from cloud
+      final history = await MongoService().getHistoryByUserId(profile.id);
+      final remoteIds = history.map((s) => s.id).toSet();
+      final localScans = hive.getAllScans();
+
+      int downloadedScans = 0;
+      int uploadedScans = 0;
+
+      // 2a. Download from cloud to local
+      for (final scan in history) {
+        if (!hive.scanBox.containsKey(scan.id)) {
+          await hive.saveScan(scan.copyWith(userId: profile.id));
+          downloadedScans++;
+        }
+      }
+
+      // 2b. Upload dari lokal ke cloud (jika data lokal belum ada di cloud)
+      for (final localScan in localScans) {
+        if (!remoteIds.contains(localScan.id)) {
+          try {
+            await MongoService().syncScanResult(localScan, profile.id);
+            uploadedScans++;
+          } catch (_) {}
+        }
+      }
+      
+      if (mounted) {
+        setState(() {});
+        String msg = 'Data riwayat sudah sinkron.';
+        if (downloadedScans > 0 || uploadedScans > 0) {
+          msg = 'Sinkronisasi berhasil: $downloadedScans didownload, $uploadedScans diupload.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFF2D7A4F),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Anda sedang offline. Menampilkan riwayat lokal.'),
+            backgroundColor: Color(0xFFE53935),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final historyRepository = HistoryRepository(
@@ -58,14 +141,19 @@ class _HistoryPageState extends State<HistoryPage> {
               context.go('/home');
             else if (index == 2)
               context.go('/profile');
-        },
-      ),
+          },
+        ),
       body: Container(
         color: const Color(0xFFF5F8F2),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
+          child: RefreshIndicator(
+            color: const Color(0xFF2D7A4F),
+            backgroundColor: Colors.white,
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const _TopNavigation(),
@@ -113,7 +201,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       Text(
                         'Riwayat Scan',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
+                          color: const Color(0xFF1C3028),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -160,16 +248,16 @@ class _HistoryPageState extends State<HistoryPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history_rounded, size: 64, color: Colors.white24),
+                        Icon(Icons.history_rounded, size: 64, color: Colors.black12),
                         SizedBox(height: 16),
                         Text(
                           'Belum ada riwayat scan',
-                          style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: Colors.black54, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         SizedBox(height: 8),
                         Text(
                           'Mulai scan makananmu untuk melihat riwayatnya di sini.',
-                          style: TextStyle(color: Colors.white38, fontSize: 13),
+                          style: TextStyle(color: Colors.black38, fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -179,6 +267,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ],
             ),
           ),
+        ),
         ),
       ),
       ),

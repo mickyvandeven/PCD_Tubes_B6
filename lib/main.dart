@@ -14,6 +14,7 @@ import 'features/onboarding/onboarding_page.dart';
 import 'features/onboarding/profile_setup_page.dart';
 import 'features/profile/profile_page.dart';
 import 'features/profile/edit_profile_page.dart';
+import 'features/profile/edit_password_page.dart';
 import 'features/scanner/scanner_page.dart';
 
 import 'dart:ui';
@@ -104,6 +105,10 @@ class FatScanApp extends StatelessWidget {
       GoRoute(
         path: '/edit-profile',
         pageBuilder: (_, __) => const NoTransitionPage(child: EditProfilePage()),
+      ),
+      GoRoute(
+        path: '/edit-password',
+        pageBuilder: (_, __) => const NoTransitionPage(child: EditPasswordPage()),
       ),
       GoRoute(
         path: '/scanner',

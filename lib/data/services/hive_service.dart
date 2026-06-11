@@ -73,9 +73,9 @@ class HiveService {
   List<ScanResultModel> getAllScans() {
     final userId = _currentUserId;
     final scans = scanBox.values.where((scan) {
-      // Scan lama tanpa userId (backward-compat) akan muncul untuk semua user.
-      // Scan baru hanya muncul untuk pemiliknya.
-      return scan.userId.isEmpty || scan.userId == userId;
+      // Hanya tampilkan scan milik user yang sedang aktif.
+      // Jika mode tamu (userId kosong), hanya tampilkan scan tamu.
+      return scan.userId == userId;
     }).toList();
     scans.sort((a, b) => b.tanggal.compareTo(a.tanggal));
     return scans;
@@ -115,6 +115,29 @@ class HiveService {
   /// Hapus semua riwayat scan
   Future<void> clearAllScans() async {
     await scanBox.clear();
+  }
+
+  // ── Unsynced Scans Queue ──────────────────────────────────────────
+  static const _keyUnsynced = 'unsynced_scans';
+
+  List<String> get unsyncedScans {
+    final list = settingsBox.get(_keyUnsynced, defaultValue: <dynamic>[]) as List<dynamic>;
+    return list.cast<String>();
+  }
+
+  Future<void> addUnsyncedScan(String id) async {
+    final list = unsyncedScans;
+    if (!list.contains(id)) {
+      list.add(id);
+      await settingsBox.put(_keyUnsynced, list);
+    }
+  }
+
+  Future<void> removeUnsyncedScan(String id) async {
+    final list = unsyncedScans;
+    if (list.remove(id)) {
+      await settingsBox.put(_keyUnsynced, list);
+    }
   }
 
   // ── User Profile ─────────────────────────────────────────────────

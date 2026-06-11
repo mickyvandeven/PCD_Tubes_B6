@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../data/models/scan_result_model.dart';
 import '../../data/services/hive_service.dart';
 import '../../data/services/mongo_service.dart';
 
@@ -86,11 +87,35 @@ class AuthService {
         // Kredensial valid → simpan profil lokal & tandai login.
         await _hive.saveProfile(verified);
 
+        // Upload riwayat scan lokal yang belum ter-sync (offline)
+        try {
+          final unsyncedIds = _hive.unsyncedScans;
+          if (unsyncedIds.isNotEmpty) {
+            final allScans = _hive.scanBox.values.toList();
+            for (final id in unsyncedIds) {
+              final scan = allScans.cast<ScanResultModel?>().firstWhere(
+                (s) => s?.id == id,
+                orElse: () => null,
+              );
+              if (scan != null) {
+                try {
+                  await MongoService().syncScanResult(scan, verified.id);
+                  await _hive.removeUnsyncedScan(id);
+                } catch (_) {}
+              } else {
+                await _hive.removeUnsyncedScan(id); // Clean up if deleted locally
+              }
+            }
+          }
+        } catch (_) {}
+
         // Download riwayat scan milik user ini dari cloud ke lokal.
         try {
           final history = await MongoService().getHistoryByUserId(verified.id);
           for (final scan in history) {
-            await _hive.saveScan(scan.copyWith(userId: verified.id));
+            if (!_hive.scanBox.containsKey(scan.id)) {
+              await _hive.saveScan(scan.copyWith(userId: verified.id));
+            }
           }
         } catch (_) {
           // Abaikan; data lokal sudah cukup untuk lanjut.
@@ -183,6 +208,53 @@ class AuthService {
       if (account == null) return AuthResult.cancelled();
 
       await _hive.setLoggedIn(account.email);
+      
+      // Cek apakah user sudah terdaftar di MongoDB
+      bool isNewUser = true;
+      try {
+        final existingProfile = await MongoService().getUserByEmail(account.email);
+        if (existingProfile != null) {
+          isNewUser = false;
+          await _hive.saveProfile(existingProfile);
+
+          // Upload riwayat scan lokal yang belum ter-sync (offline)
+          try {
+            final unsyncedIds = _hive.unsyncedScans;
+            if (unsyncedIds.isNotEmpty) {
+              final allScans = _hive.scanBox.values.toList();
+              for (final id in unsyncedIds) {
+                final scan = allScans.cast<ScanResultModel?>().firstWhere(
+                  (s) => s?.id == id,
+                  orElse: () => null,
+                );
+                if (scan != null) {
+                  try {
+                    await MongoService().syncScanResult(scan, existingProfile.id);
+                    await _hive.removeUnsyncedScan(id);
+                  } catch (_) {}
+                } else {
+                  await _hive.removeUnsyncedScan(id);
+                }
+              }
+            }
+          } catch (_) {}
+
+          // Download riwayat scan milik user ini dari cloud ke lokal.
+          try {
+            final history = await MongoService().getHistoryByUserId(existingProfile.id);
+            for (final scan in history) {
+              if (!_hive.scanBox.containsKey(scan.id)) {
+                await _hive.saveScan(scan.copyWith(userId: existingProfile.id));
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (e) {
+        debugPrint('Error checking Google user in DB: $e');
+        // Lanjut saja menganggap user baru jika gagal ambil profil dari DB?
+        // Atau biarkan gagal jika tidak ada koneksi. Lebih aman biarkan lanjut
+        // agar user tidak stuck, tetapi risikonya profil tidak tersync.
+      }
 
       return AuthResult.success(
         googleData: {
@@ -191,9 +263,7 @@ class AuthService {
           'googleId': account.id,
           'photoUrl': account.photoUrl ?? '',
         },
-        // Tanpa backend kita tidak tahu user lama/baru, jadi serahkan ke
-        // pemanggil (mis. cek MongoService) untuk memutuskan.
-        isNewUser: true,
+        isNewUser: isNewUser,
       );
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');

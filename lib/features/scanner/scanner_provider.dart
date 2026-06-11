@@ -179,7 +179,13 @@ class ScannerProvider extends ChangeNotifier {
       // Push ke MongoDB Atlas
       final profile = _hive.getProfile();
       if (profile != null) {
-        await MongoService().syncScanResult(_result!, profile.id);
+        await _hive.addUnsyncedScan(_result!.id);
+        try {
+          await MongoService().syncScanResult(_result!, profile.id);
+          await _hive.removeUnsyncedScan(_result!.id);
+        } catch (_) {
+          throw Exception('Tersimpan di lokal, tapi gagal sync ke cloud. Periksa internet.');
+        }
       }
     } catch (e) {
       debugPrint('ScannerProvider.saveScan error: $e');
@@ -190,6 +196,8 @@ class ScannerProvider extends ChangeNotifier {
   /// Reset ke idle
   void reset() {
     _camera.dispose(); // Bebaskan kamera sepenuhnya (bukan cuma stopStream)
+    _inferenceService.dispose();
+    _inferenceService.init();
     _currentDetections.clear();
     _imageFile = null;
     _result = null;

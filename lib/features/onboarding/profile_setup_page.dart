@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/hive_service.dart';
 import '../../data/services/mongo_service.dart';
+import '../auth/widgets/auth_text_field.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   /// isEdit = true saat dipanggil dari Profile page untuk mengedit
@@ -25,10 +26,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   late Animation<double> _fadeAnim;
 
   int _step = 0;
-  final int _totalSteps = 5;
+  late final int _totalSteps;
 
   // ── Form fields ────────────────────────────────────────────────
   final _namaCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
   String _jenisKelamin = 'pria';
   int _usia = 22;
   double _beratBadan = 65.0;
@@ -47,6 +50,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   @override
   void initState() {
     super.initState();
+    _totalSteps = widget.googleData != null ? 6 : 5;
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -74,6 +78,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   void dispose() {
     _pageController.dispose();
     _namaCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -113,12 +119,17 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
       updatedAt: DateTime.now(),
     );
     await HiveService().saveProfile(profile);
-    MongoService().syncUserProfile(profile); // Trigger MongoDB sync in background
+    MongoService().syncUserProfile(profile, password: widget.googleData != null ? _passwordCtrl.text : null); // Trigger MongoDB sync in background
     if (mounted) context.go('/home');
   }
 
   bool get _canProceed {
     if (_step == 0) return _namaCtrl.text.trim().isNotEmpty;
+    if (widget.googleData != null && _step == 5) {
+      return _passwordCtrl.text.isNotEmpty &&
+             _passwordCtrl.text.length >= 6 &&
+             _passwordCtrl.text == _confirmPasswordCtrl.text;
+    }
     return true;
   }
 
@@ -163,6 +174,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
                     selected: _levelAktivitas,
                     onChanged: (v) => setState(() => _levelAktivitas = v),
                   ),
+                  if (widget.googleData != null)
+                    _StepPassword(
+                      passwordCtrl: _passwordCtrl,
+                      confirmCtrl: _confirmPasswordCtrl,
+                      onChanged: () => setState(() {}),
+                    ),
                 ],
               ),
             ),
@@ -1003,6 +1020,74 @@ class _BottomCta extends StatelessWidget {
             child: Text(_buttonLabel),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Step 6 (Google Only): Password ───────────────────────────────────────────
+
+class _StepPassword extends StatelessWidget {
+  const _StepPassword({
+    required this.passwordCtrl,
+    required this.confirmCtrl,
+    required this.onChanged,
+  });
+
+  final TextEditingController passwordCtrl;
+  final TextEditingController confirmCtrl;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Atur Password',
+            style: TextStyle(
+              color: Color(0xFF1C3028),
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Karena kamu mendaftar dengan Google, atur password sekarang untuk bisa login menggunakan email di kemudian hari.',
+            style: TextStyle(color: Color(0xFF4D7060), fontSize: 15, height: 1.5),
+          ),
+          const SizedBox(height: 32),
+          AuthTextField(
+            controller: passwordCtrl,
+            label: 'Password',
+            hint: 'Minimal 6 karakter',
+            icon: Icons.lock_outline_rounded,
+            isPassword: true,
+            onChanged: (_) => onChanged(),
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Password harus diisi';
+              if (value.length < 6) return 'Password minimal 6 karakter';
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+          AuthTextField(
+            controller: confirmCtrl,
+            label: 'Konfirmasi Password',
+            hint: 'Ulangi password',
+            icon: Icons.lock_rounded,
+            isPassword: true,
+            onChanged: (_) => onChanged(),
+            textInputAction: TextInputAction.done,
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Konfirmasi password harus diisi';
+              if (value != passwordCtrl.text) return 'Password tidak cocok';
+              return null;
+            },
+          ),
+        ],
       ),
     );
   }

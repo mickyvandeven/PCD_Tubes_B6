@@ -42,7 +42,7 @@ class AuthController extends ChangeNotifier {
   static String? validatePassword(String? value) {
     final v = value ?? '';
     if (v.isEmpty) return 'Password tidak boleh kosong';
-    if (v.length < 8) return 'Password minimal 8 karakter';
+    if (v.length < 6) return 'Password minimal 6 karakter';
     return null;
   }
 

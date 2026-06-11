@@ -52,6 +52,7 @@ class FoodItem extends HiveObject {
     double? calories,
     double? fat,
   }) {
+    final bool recalc = grams != null || defaultGrams != null || defaultFat != null || defaultCalories != null;
     return FoodItem(
       name: name ?? this.name,
       grams: grams ?? this.grams,
@@ -59,8 +60,8 @@ class FoodItem extends HiveObject {
       defaultFat: defaultFat ?? this.defaultFat,
       defaultCalories: defaultCalories ?? this.defaultCalories,
       confidence: confidence ?? this.confidence,
-      calories: calories ?? this.calories,
-      fat: fat ?? this.fat,
+      calories: calories ?? (recalc ? null : this.calories),
+      fat: fat ?? (recalc ? null : this.fat),
     );
   }
 
